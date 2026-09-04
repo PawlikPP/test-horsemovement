@@ -1,0 +1,1481 @@
+<!DOCTYPE html>
+<html lang="pl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Chód konia — generator kopyt v0.9</title>
+<style>
+
+:root{
+  --bg:#080d0f;
+  --panel:rgba(14,19,22,.90);
+  --panel-2:#11171a;
+  --panel-3:#161d20;
+  --line:#30373b;
+  --line-soft:#242b2f;
+  --text:#f1f2f1;
+  --muted:#a8adb0;
+  --gold:#f0b85c;
+  --gold-hi:#ffc96f;
+  --rust:#c77b54;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;min-height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Segoe UI",Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  line-height:1.35;
+  padding:0 0 38px;
+}
+/* Nieruchome tło strony. Kontener wysokości 100vh, przyklejony do dołu ekranu.
+   object-fit:cover + object-position:top dogląda, żeby zawsze widoczna była górna
+   część fotografii — kopyta konia w kurzu — tak jak na zdjęciu referencyjnym, a niżej
+   przechodzi w spokojną fakturę ziemi, przyciemnianą gradientem w miarę schodzenia w dół
+   strony. Element jest position:fixed, więc się nie przewija — rusza się tylko interfejs
+   nad nim. */
+.bg-fixed{
+  position:fixed;
+  left:0;right:0;bottom:0;
+  height:100vh;
+  overflow:hidden;
+  z-index:-3;
+  pointer-events:none;
+}
+.bg-fixed img{
+  display:block;
+  width:100%;height:100%;
+  object-fit:cover;
+  object-position:center top;
+}
+.bg-fixed:after{
+  content:"";
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(8,13,15,.18) 0%,rgba(8,13,15,.28) 35%,rgba(9,14,16,.42) 65%,rgba(9,14,16,.55) 100%);
+}
+.wrap{max-width:1286px;margin:0 auto;padding:0 0 30px;}
+.hero{
+  position:relative;
+  min-height:250px;
+  padding:48px 12px 30px;
+  overflow:hidden;
+  display:flex;align-items:center;
+}
+.hero-copy{max-width:720px;position:relative;z-index:2}
+h1{
+  margin:0 0 2px;
+  font-size:48px;
+  line-height:1.04;
+  letter-spacing:.2px;
+  font-weight:800;
+  text-transform:uppercase;
+  color:#f5f5f3;
+}
+h1 span{display:none!important}
+.subtitle{
+  margin:7px 0 10px;
+  color:var(--gold);
+  font-size:22px;
+  line-height:1.2;
+  letter-spacing:.1px;
+}
+.hero-desc{
+  margin:0;color:#d4d6d5;font-size:15px;max-width:700px;
+}
+.dashboard{display:grid;grid-template-columns:515px 1fr;gap:10px;}
+.section{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:linear-gradient(145deg,rgba(17,23,26,.95),rgba(12,17,20,.91));
+  box-shadow:0 14px 30px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.025);
+  padding:18px 20px;
+  margin:0;
+}
+.section h2{
+  font-family:inherit;font-size:15px;font-weight:700;
+  color:#f0f1f0;margin:0 0 15px;text-transform:uppercase;
+  letter-spacing:.15px;
+}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 15px}
+.section-head h2{margin:0}
+.section-head .section-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px}
+.reset-tile-btn{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;
+  height:26px;padding:0 10px;border:1px solid var(--line-soft);border-radius:20px;
+  background:rgba(255,255,255,.02);color:#9aa0a2;font-family:inherit;font-size:11px;font-weight:600;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;white-space:nowrap;
+}
+.reset-tile-btn:before{content:"↺";font-size:13px;line-height:1}
+.reset-tile-btn:hover{border-color:var(--gold);color:var(--gold-hi);background:rgba(240,184,92,.06)}
+.reset-tile-btn:active{transform:scale(.96)}
+.section p.hint{color:var(--muted);font-size:12px;margin:-8px 0 14px}
+.samples-panel{min-height:430px}
+.drop{
+  height:96px;border:1px dashed #3d4549;border-radius:9px;
+  padding:0;display:flex;align-items:center;justify-content:center;
+  text-align:center;cursor:pointer;color:#b7bdc0;
+  background:rgba(7,11,13,.36);transition:.15s ease;
+}
+.drop:hover,.drop.drag{border-color:var(--gold);background:rgba(240,184,92,.05);color:#eee}
+.drop strong{display:block;color:#f2f3f2;font-size:14px;font-weight:500;margin-bottom:4px}
+.drop div:after{content:"WAV, AIFF, FLAC, MP3";display:block;font-size:12px;color:#80878a;margin-top:3px}
+.drop div{font-size:0}
+.drop strong{font-size:14px}
+.drop strong:after{content:"";}
+input[type=file]{display:none}
+.sample-list{list-style:none;margin:13px 0 0;padding:0;display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.sample-list li{
+  min-height:41px;display:flex;align-items:center;justify-content:space-between;
+  background:#111619;border:0;border-bottom:1px solid var(--line-soft);
+  border-radius:0;padding:0 11px;font-size:13px;color:#d5d7d7;
+}
+.sample-list li:last-child{border-bottom:0}
+.clear-all-btn{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;
+  height:26px;padding:0 10px;border:1px solid var(--line-soft);border-radius:20px;
+  background:rgba(255,255,255,.02);color:#9aa0a2;font-family:inherit;font-size:11px;font-weight:600;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;white-space:nowrap;
+}
+.clear-all-btn:before{content:"🗑";font-size:12px;line-height:1}
+.clear-all-btn:hover{border-color:#e8785c;color:#e8785c;background:rgba(240,120,92,.08)}
+.clear-all-btn:active{transform:scale(.96)}
+.clear-all-btn:disabled{opacity:.35;cursor:default;pointer-events:none}
+.samples-toggle{
+  width:100%;margin-top:9px;height:34px;
+  border:1px solid var(--line);border-radius:8px;
+  background:#111619;color:#b7bdc0;font-family:inherit;font-size:12px;font-weight:600;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;
+}
+.samples-toggle:hover{border-color:var(--gold);color:var(--gold-hi);background:rgba(240,184,92,.05)}
+.sample-list li:before{
+  content:"▶";font-size:11px;color:#b8babb;margin-right:11px;flex:0 0 auto
+}
+.sample-list li>span{flex:1;display:flex;align-items:center;min-width:0}
+.sample-list button{
+  width:27px;height:27px;padding:0;border:0;background:transparent;color:#aeb2b4;
+  font-size:0;cursor:pointer;position:relative;border-radius:6px;transition:.15s ease
+}
+.sample-list button:hover{background:rgba(240,120,92,.10)}
+.sample-list button:after{content:"🗑";font-size:14px;color:#a8abad;}
+.sample-list button:hover:after{color:#e8785c}
+.modal-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(4,7,8,.72);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  animation:modalFade .15s ease;
+}
+@keyframes modalFade{from{opacity:0}to{opacity:1}}
+.modal-box{
+  width:100%;max-width:480px;
+  background:linear-gradient(145deg,rgba(20,26,29,.98),rgba(13,18,21,.98));
+  border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);
+  padding:24px 24px 20px;
+}
+.modal-box h3{margin:0 0 6px;font-size:18px;color:#f5f5f3;letter-spacing:.2px}
+.modal-box p.hint{color:var(--muted);font-size:13px;margin:0 0 18px}
+.upload-mode-options{display:flex;flex-direction:column;gap:10px}
+.upload-mode-option{
+  display:block;width:100%;text-align:left;
+  border:1px solid var(--line);border-radius:10px;
+  background:#111619;color:var(--text);
+  padding:13px 14px;cursor:pointer;font-family:inherit;
+  transition:.15s ease;
+}
+.upload-mode-option:hover{border-color:var(--gold);background:rgba(240,184,92,.06)}
+.upload-mode-option:active{transform:scale(.99)}
+.upload-mode-option strong{display:block;font-size:14px;color:var(--gold-hi);margin-bottom:4px}
+.upload-mode-option span{display:block;font-size:12.5px;color:var(--muted);line-height:1.4}
+.modal-actions{display:flex;justify-content:flex-end;margin-top:16px}
+.modal-cancel-btn{
+  border:1px solid var(--line-soft);border-radius:20px;background:transparent;
+  color:#9aa0a2;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.2px;
+  padding:7px 14px;cursor:pointer;transition:.15s ease;
+}
+.modal-cancel-btn:hover{border-color:#e8785c;color:#e8785c}
+.gaits{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:17px}
+.gait-btn{
+  height:133px;background:linear-gradient(180deg,#151b1e,#111619);
+  border:1px solid #2a3236;color:#a8adaf;border-radius:11px;
+  padding:14px 8px 10px;text-align:center;cursor:pointer;font-size:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+  transition:.15s ease;position:relative;
+}
+.gait-btn:before{
+  content:"";position:absolute;top:14px;left:0;right:0;height:56px;
+  background-repeat:no-repeat;background-position:center;background-size:contain;
+  transition:.15s ease;
+}
+.gait-btn[data-gait="walk"]:before{background-image:url('horses/horse-walk-grey.png')}
+.gait-btn[data-gait="trot"]:before{background-image:url('horses/horse-trot-grey.png')}
+.gait-btn[data-gait="canter"]:before{background-image:url('horses/horse-canter-grey.png')}
+.gait-btn[data-gait="gallop"]:before{background-image:url('horses/horse-gallop-grey.png')}
+.gait-btn.active{
+  border-color:var(--gold);background:linear-gradient(180deg,#3a2c1c,#2b2116);
+  color:var(--gold-hi);box-shadow:inset 0 0 28px rgba(240,184,92,.07);
+}
+.gait-btn.active[data-gait="walk"]:before{background-image:url('horses/horse-walk-gold.png')}
+.gait-btn.active[data-gait="trot"]:before{background-image:url('horses/horse-trot-gold.png')}
+.gait-btn.active[data-gait="canter"]:before{background-image:url('horses/horse-canter-gold.png')}
+.gait-btn.active[data-gait="gallop"]:before{background-image:url('horses/horse-gallop-gold.png')}
+.gait-btn:hover{color:#e9eaeb}
+.gait-btn .beat-count{display:block;font-size:12px;color:#8d9396;margin-top:4px}
+.gait-btn.active .beat-count{color:#b5a487}
+.field{margin-bottom:17px}
+.field label{
+  display:flex;justify-content:space-between;gap:14px;
+  font-size:13px;color:#e0e2e2;margin-bottom:8px
+}
+.field label span.val{color:var(--gold);font-variant-numeric:tabular-nums}
+input[type=range]{
+  width:100%;height:4px;accent-color:var(--gold);
+  appearance:auto;cursor:pointer
+}
+input[type=range]:disabled{opacity:.4}
+.controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+select{
+  width:100%;height:36px;background:#111619;color:#eceeee;border:1px solid #343c40;
+  border-radius:7px;padding:0 11px;font-family:inherit;font-size:13px
+}
+.checkbox-label{display:flex;align-items:center;gap:9px;font-size:13px;color:#e4e6e6;cursor:pointer}
+.checkbox-label.has-tip{position:relative}
+.checkbox-label .tip-bubble{
+  position:absolute;left:0;top:calc(100% + 8px);z-index:20;width:100%;max-width:420px;
+  background:#1a2124;border:1px solid var(--line-soft);border-radius:8px;
+  padding:10px 12px;font-size:12px;line-height:1.45;color:var(--muted);
+  box-shadow:0 8px 20px rgba(0,0,0,.35);
+  opacity:0;visibility:hidden;transform:translateY(-4px);
+  transition:opacity .15s ease,transform .15s ease,visibility .15s;
+  pointer-events:none;
+}
+.checkbox-label.has-tip:hover .tip-bubble{opacity:1;visibility:visible;transform:translateY(0)}
+.checkbox-label input[type=checkbox]{width:17px;height:17px;accent-color:var(--gold);cursor:pointer}
+.preview-shell{height:205px;border:1px solid var(--line-soft);border-radius:8px;overflow:hidden;background:#111618;position:relative}
+.timeline-ui{position:absolute;inset:0;display:grid;grid-template-columns:207px 1fr}
+.foot-labels{display:grid;grid-template-rows:repeat(4,1fr);border-right:1px solid #252c30;background:rgba(15,20,22,.95)}
+.foot-row{display:flex;align-items:center;gap:14px;padding-left:11px;border-bottom:1px solid #252b2e;color:#c8cbcb;font-size:12px}
+.foot-row:last-child{border-bottom:0}
+.hoof{width:31px;height:25px;position:relative;display:inline-block;color:#e5e7e7}
+.hoof:before,.hoof:after{content:"";position:absolute;top:5px;width:9px;height:16px;border:3px solid currentColor;border-top-color:transparent;border-radius:0 0 9px 9px;transform:rotate(22deg)}
+.hoof:before{left:5px}.hoof:after{right:5px;transform:rotate(-22deg)}
+.hoof.gold{color:var(--gold-hi)} .hoof.rust{color:#d98d67}
+.track{position:relative;background:
+  repeating-linear-gradient(to right,transparent 0,transparent 31px,rgba(255,255,255,.025) 32px),
+  repeating-linear-gradient(to right,transparent 0,transparent 163px,rgba(255,255,255,.10) 164px),
+  repeating-linear-gradient(to bottom,transparent 0,transparent 48px,rgba(255,255,255,.055) 49px),
+  linear-gradient(#111719,#111719)}
+.track:before{content:"";position:absolute;inset:0;background:linear-gradient(to right,transparent 0 15%,rgba(255,184,91,.045) 15.2% 16%,transparent 16.2% 31%,rgba(255,184,91,.045) 31.2% 32%,transparent 32.2% 100%)}
+.beat-dot{position:absolute;width:24px;height:24px;margin-left:-12px;margin-top:-12px;top:50%;border:3px solid var(--gold);border-top-color:transparent;border-radius:50%;transform:rotate(20deg)}
+.beat-dot.r{border-color:#b6bbbd;border-top-color:transparent}
+.beat-dot.o{border-color:#d9865d;border-top-color:transparent}
+.tick{position:absolute;top:0;bottom:0;width:1px;background:#3c4448}
+.tick b{position:absolute;top:-18px;left:4px;color:#969c9f;font-size:11px;font-weight:400}
+.output-panel{grid-column:1 / -1;margin-top:0;padding-top:14px}
+.output-panel .playbar{margin-top:0}
+.advanced{margin-top:0;grid-column:1 / -1;width:100%;}
+.advanced>summary{
+  list-style:none;cursor:pointer;
+  display:flex;align-items:center;min-height:44px;padding:0 16px;
+  border:1px solid var(--line);border-radius:9px;
+  background:linear-gradient(180deg,#151b1d,#101517);
+  color:#f0f1f0;font-family:inherit;font-size:15px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.15px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+  transition:border-color .15s ease,color .15s ease;
+}
+.advanced>summary::-webkit-details-marker{display:none}
+.advanced>summary:hover{border-color:#454d50;color:#f7f8f7}
+.advanced>summary:before{content:"⚙";color:var(--gold);font-size:15px;margin-right:10px}
+.advanced>summary:after{content:"▸";margin-left:auto;color:var(--gold);font-size:13px;display:inline-block;transition:transform .32s cubic-bezier(.4,0,.2,1)}
+.advanced[open]>summary{border-radius:9px 9px 0 0;border-bottom-color:transparent}
+.advanced.is-anim-open>summary:after{transform:rotate(90deg)}
+.advanced .advanced-body{
+  padding:12px;
+  border:1px solid #252d30;border-top:0;border-radius:0 0 9px 9px;
+  background:#0d1214;
+  display:grid;gap:10px;
+}
+.advanced .section{
+  margin:0;padding:14px 16px;
+  border:1px solid var(--line-soft);border-radius:9px;
+  background:linear-gradient(145deg,rgba(20,26,29,.9),rgba(14,19,22,.88));
+  box-shadow:inset 0 1px rgba(255,255,255,.02);
+}
+.advanced .section h2{margin-bottom:11px;color:#d2d5d5;font-size:12px;letter-spacing:.45px}
+.player-settings{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:24px;align-items:end;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line-soft)}
+.player-settings .field{margin-bottom:0}
+.playbar{
+  margin-top:13px;height:90px;border:1px solid var(--line);border-radius:11px;
+  background:linear-gradient(180deg,#111719,#0e1416);
+  display:grid;grid-template-columns:48px 48px 48px 90px 135px 1fr 170px;align-items:center;
+  gap:10px;padding:0 18px
+}
+.circle-btn{width:46px;height:46px;border-radius:50%;border:1px solid #454d50;background:#171d20;color:#dfe1e1;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:box-shadow .2s ease,border-color .2s ease}
+.circle-btn.play{border-color:var(--gold);color:var(--gold);font-size:20px;box-shadow:0 0 18px rgba(240,184,92,.08)}
+.circle-btn.play.active{box-shadow:0 0 24px rgba(240,184,92,.32);border-color:var(--gold-hi)}
+.time-block b{font-size:18px;color:#f1f2f2;font-weight:500} .time-block small{display:block;color:#8f9699;font-size:10px;text-transform:uppercase;letter-spacing:.6px}
+.preview-wrap{
+  height:58px;position:relative;border-radius:9px;overflow:hidden;
+  background:linear-gradient(180deg,#151b1e,#0d1214);
+  border:1px solid #262d30;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),inset 0 0 22px rgba(0,0,0,.4);
+}
+.preview-canvas{display:block;width:100%;height:100%}
+.preview-wrap .playhead{
+  position:absolute;top:0;bottom:0;left:0;width:2px;
+  background:linear-gradient(180deg,var(--gold-hi),var(--gold));
+  box-shadow:0 0 10px rgba(240,184,92,.75),0 0 2px rgba(255,255,255,.6);
+  pointer-events:none;opacity:0;transition:opacity .15s ease;transform:translateX(-1px);
+}
+.preview-wrap .playhead.active{opacity:1}
+.export{height:46px;border:1px solid #454c4f;background:#111719;border-radius:7px;color:#f0f1f1;font-weight:600;font-size:14px;cursor:pointer}
+.export:hover{border-color:var(--gold);color:var(--gold-hi)}
+.actions{display:none}
+.status{font-size:12px;color:#7f878a;margin-top:8px;min-height:1.2em}
+footer{display:none}
+@media(max-width:1050px){
+  .wrap{padding:0 16px}.dashboard{grid-template-columns:1fr}
+  .hero{padding-left:0}.playbar{grid-template-columns:48px 48px 48px 90px 120px 1fr 150px}
+  .player-settings{grid-template-columns:1fr 1fr}
+}
+@media(max-width:720px){
+  h1{font-size:36px}.subtitle{font-size:18px}.hero{min-height:205px}
+  .gaits{grid-template-columns:repeat(2,1fr)}.controls-grid{grid-template-columns:1fr}
+  .playbar{grid-template-columns:46px 46px 46px 75px 1fr 110px;gap:7px;padding:0 9px}
+  .playbar .time-block:nth-of-type(2){display:none}
+  .timeline-ui{grid-template-columns:130px 1fr}.foot-row{gap:8px;padding-left:7px}
+  .player-settings{grid-template-columns:1fr}
+}
+
+</style>
+</head>
+<body>
+
+<div class="bg-fixed"><img src="bg.jpg" alt=""></div>
+
+<div class="modal-overlay" id="uploadModeOverlay" style="display:none">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="uploadModeTitle">
+    <h3 id="uploadModeTitle">Co zawierają wgrywane pliki?</h3>
+    <p class="hint">Wybierz opcję pasującą do Twoich nagrań — złe dopasowanie może spowodować błędne przycinanie próbek.</p>
+    <div class="upload-mode-options">
+      <button type="button" class="upload-mode-option" id="uploadModeSingle" data-mode="single">
+        <strong>Pojedyncze uderzenia</strong>
+        <span>Każdy plik zawiera dokładnie jedno uderzenie kopyta (np. 10 osobnych plików = 10 próbek).</span>
+      </button>
+      <button type="button" class="upload-mode-option" id="uploadModeMulti" data-mode="multi">
+        <strong>Nagrania z wieloma uderzeniami</strong>
+        <span>Przynajmniej jeden plik zawiera kilka lub kilkadziesiąt uderzeń kopyta nagranych pod rząd — program automatycznie je wykryje i rozdzieli.</span>
+      </button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="modal-cancel-btn" id="uploadModeCancel">Anuluj</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-copy">
+      <h1>CHÓD KONIA</h1>
+      <div class="subtitle">Generator sekwencji kopyt</div>
+      <p class="hero-desc">Stwórz realistyczny chód konia z własnych próbek audio.</p>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="section samples-panel">
+      <h2>1. PRÓBKI KOPYT</h2>
+      <p class="hint">Możesz wgrać jedną próbkę albo kilka (np. różne twardości uderzenia) — narzędzie będzie je losowo mieszać, żeby brzmienie nie było mechaniczne.</p>
+      <div class="drop" id="drop">
+        <div><strong>PRZECIĄGNIJ I UPUŚĆ PLIKI AUDIO</strong> lub kliknij, aby wybrać pliki</div>
+      </div>
+      <input type="file" id="fileInput" accept="audio/*" multiple>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:17px 0 7px;font-size:13px">
+        <span style="color:#f0f1f1">ZAŁADOWANE PRÓBKI</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="color:#a2a8aa" id="sampleCountLabel">0 plików</span>
+          <button type="button" class="clear-all-btn" id="clearAllBtn" disabled>Usuń wszystkie</button>
+        </span>
+      </div>
+      <ul class="sample-list" id="sampleList"></ul>
+      <button class="samples-toggle" id="toggleSamplesBtn" style="display:none;"></button>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <h2>2. CHÓD</h2>
+        <button type="button" class="reset-tile-btn" data-reset="chod">Domyślne</button>
+      </div>
+      <div class="gaits" id="gaits">
+        <div class="gait-btn" data-gait="walk">STĘP<span class="beat-count">4-Beat</span></div>
+        <div class="gait-btn" data-gait="trot">KŁUS<span class="beat-count">2-Beat</span></div>
+        <div class="gait-btn" data-gait="canter">GALOP<span class="beat-count">3-Beat</span></div>
+        <div class="gait-btn" data-gait="gallop">CWAŁ<span class="beat-count">4-Beat</span></div>
+      </div>
+      <div class="controls-grid" style="border-top:1px solid var(--line-soft);padding-top:18px">
+        <div>
+          <div class="field">
+            <label>TEMPO <span class="val" id="tempoVal">55</span></label>
+            <input type="range" id="tempo" min="20" max="220" value="55">
+          </div>
+          <div class="field">
+            <label>INTENSYWNOŚĆ <span class="val" id="energyVal">60%</span></label>
+            <input type="range" id="energy" min="5" max="220" value="60">
+          </div>
+        </div>
+        <div>
+          <div class="field">
+            <label>HUMANIZACJA <span class="val" id="jitterVal">15%</span></label>
+            <input type="range" id="jitter" min="0" max="100" value="15">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:2px">
+        <div class="field"><label>PRZEJŚCIA MIĘDZY CHODAMI</label><select id="transitionMode">
+          <option value="none" selected>Brak (jeden chód)</option>
+          <option value="walk-trot">Stęp → Kłus</option>
+          <option value="trot-canter">Kłus → Galop</option>
+          <option value="canter-gallop">Galop → Cwał</option>
+          <option value="walk-trot-canter">Stęp → Kłus → Galop</option>
+          <option value="custom">Pełna sekwencja (Stęp→Kłus→Galop→Cwał)</option>
+        </select></div>
+      </div>
+    </section>
+
+
+    <details class="advanced">
+      <summary>3. Ustawienia zaawansowane (opcjonalne)</summary>
+      <div class="advanced-body">
+        <section class="section">
+          <div class="section-head">
+            <h2>Tempo i przejścia</h2>
+            <button type="button" class="reset-tile-btn" data-reset="tempo">Domyślne</button>
+          </div>
+          <div class="field" id="leadField" style="display:none"><label>Przewaga galopu</label><select id="leadSelect"><option value="right" selected>Prawa noga prowadząca</option><option value="left">Lewa noga prowadząca</option></select></div>
+          <div class="controls-grid">
+            <div class="field"><label>Tempo — przyspieszenie / zwolnienie (%) <span class="val" id="tempoChangeVal">0</span></label><input type="range" id="tempoChange" min="-85" max="85" value="0"></div>
+            <div class="field"><label>Czas zmiany tempa (s) <span class="val" id="tempoChangeTimeVal">2.5</span></label><input type="range" id="tempoChangeTime" min=".2" max="15" value="2.5" step=".1"></div>
+            <div class="field"><label>Czas do pierwszego przejścia (s) <span class="val" id="transitionAtVal">0</span></label><input type="range" id="transitionAt" min="0" max="60" value="0" step=".5"></div>
+            <div class="field"><label>Czas przejścia między chodami (s) <span class="val" id="transitionDurVal">2.5</span></label><input type="range" id="transitionDur" min=".3" max="12" value="2.5" step=".1"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-head">
+            <h2>Biomechanika chodu</h2>
+            <button type="button" class="reset-tile-btn" data-reset="biomechanika">Domyślne</button>
+          </div>
+          <p class="hint">Modeluje relacje pomiędzy cyklem ruchu, długością kroku i fazą zawieszenia. Losowość jest nakładana na cały cykl, a nie niezależnie na każdą nogę.</p>
+          <div class="controls-grid">
+            <div class="field"><label>Prędkość ruchu (%) <span class="val" id="speedVal">100</span></label><input type="range" id="speed" min="20" max="240" value="100"></div>
+            <div class="field"><label>Długość kroku (%) <span class="val" id="strideVal">100</span></label><input type="range" id="strideLength" min="40" max="180" value="100"></div>
+            <div class="field"><label>Spójność cyklu / korelacja nóg (%) <span class="val" id="correlationVal">78</span></label><input type="range" id="cycleCorrelation" min="0" max="100" value="78" title="Im wyższa wartość, tym bardziej ruch nóg zachowuje spójność całego cyklu."></div>
+            <div class="field"><label>Dissocjacja par (ms) <span class="val" id="dissociationVal">5</span></label><input type="range" id="dissociation" min="0" max="120" value="5" step="1"></div>
+            <div class="field"><label>Faza zawieszenia (%) <span class="val" id="suspensionVal">14</span></label><input type="range" id="suspension" min="0" max="80" value="14" title="Aktywne głównie dla galopu i cwału — określa długość fazy, w której wszystkie kopyta pozostają poza podłożem."></div>
+            <div class="field"><label>Stabilność cyklu (%) <span class="val" id="cycleStabilityVal">92</span></label><input type="range" id="cycleStability" min="0" max="100" value="92"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-head">
+            <h2>Charakter konia</h2>
+            <button type="button" class="reset-tile-btn" data-reset="charakter">Domyślne</button>
+          </div>
+          <p class="hint">Te parametry zmieniają fizyczny charakter kontaktu kopyta oraz skalują energię całego chodu.</p>
+          <div class="controls-grid">
+            <div class="field"><label>Masa konia (kg) <span class="val" id="massVal">500</span></label><input type="range" id="mass" min="100" max="1500" value="500" step="10"></div>
+            <div class="field"><label>Wariant próbki (%) <span class="val" id="variantVal">55</span></label><input type="range" id="sampleVariant" min="0" max="100" value="55"></div>
+            <div class="field"><label>Transient / atak (%) <span class="val" id="transientVal">55</span></label><input type="range" id="transient" min="0" max="200" value="55"></div>
+            <div class="field"><label>Body / ciężar (%) <span class="val" id="bodyVal">60</span></label><input type="range" id="body" min="0" max="200" value="60"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-head">
+            <h2>Naturalność</h2>
+            <button type="button" class="reset-tile-btn" data-reset="naturalnosc">Domyślne</button>
+          </div>
+          <p class="hint">Przednie i tylne kopyto mają lekko inną barwę i głośność — tak jak w prawdziwym stąpaniu. Poniższe suwaki dokładają do tego kontrolowaną losowość.</p>
+          <div class="field"><label>Panorama stereo — lewa/prawa noga (%) <span class="val" id="panStrengthVal">0</span></label><input type="range" id="panStrength" min="0" max="100" value="0"></div>
+          <div class="controls-grid">
+            <div class="field"><label>Nierówność głośności (%) <span class="val" id="volVal">18</span></label><input type="range" id="volJitter" min="0" max="100" value="18"></div>
+            <div class="field"><label>Nierówność barwy (%) <span class="val" id="pitchVal">4</span></label><input type="range" id="pitchJitter" min="0" max="50" value="4"></div>
+            <div class="field"><label>Wahania tempa krok-po-kroku (%) <span class="val" id="driftVal">6</span></label><input type="range" id="tempoDrift" min="0" max="50" value="6"></div>
+          </div>
+        </section>
+      </div>
+    </details>
+
+
+
+    <section class="section output-panel">
+      <div class="section-head" style="margin-bottom:9px">
+        <h2>4. Odtwarzanie i eksport</h2>
+        <button type="button" class="reset-tile-btn" data-reset="output">Domyślne</button>
+      </div>
+      <div class="player-settings">
+        <div class="field"><label>DŁUGOŚĆ (S) <span class="val" id="durVal">8</span></label><input type="range" id="duration" min="2" max="30" value="8"></div>
+        <div class="field"><label>GŁOŚNOŚĆ (DB) <span class="val" id="masterVolVal">0</span></label><input type="range" id="masterVolume" min="-24" max="6" value="0" step="0.5"></div>
+        <div class="field"><label>FORMAT PLIKU</label><select id="fileFormat">
+          <option value="wav" selected>WAV</option>
+          <option value="mp3">MP3</option>
+        </select></div>
+        <div class="field" id="wavQualityField"><label>JAKOŚĆ WAV</label><select id="wavFormat">
+          <option value="24" selected>48 kHz / 24-bit</option>
+          <option value="16">48 kHz / 16-bit</option>
+          <option value="44">44,1 kHz / 16-bit</option>
+        </select></div>
+        <div class="field" id="mp3QualityField" style="display:none"><label>JAKOŚĆ MP3</label><select id="mp3Bitrate">
+          <option value="320">320 kb/s</option>
+          <option value="192" selected>192 kb/s</option>
+          <option value="128">128 kb/s</option>
+        </select></div>
+      </div>
+      <div class="playbar">
+        <button class="circle-btn play" id="playBtn" disabled>▶</button>
+        <button class="circle-btn" id="stopVisual">■</button>
+        <button class="circle-btn" id="rerollBtn" disabled>↻</button>
+        <div class="time-block"><b id="bigTempo">55</b><small>BPM<br>TEMPO</small></div>
+        <div class="time-block"><b id="bigTime">0:00.00</b><small>CZAS</small></div>
+        <div class="preview-wrap">
+          <canvas id="timeline" class="preview-canvas" width="1200" height="200" aria-hidden="true"></canvas>
+          <div class="playhead" id="playhead"></div>
+        </div>
+        <button class="export" id="renderBtn" disabled>⇩ &nbsp; EKSPORTUJ</button>
+      </div>
+      <div class="status" id="status">Wgraj przynajmniej jedną próbkę, aby zacząć.</div>
+      <div class="status" id="variantStatus"></div>
+    </section>
+  </main>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+<script>
+(function(){
+  const GAITS = {
+    walk:{ label:'Stęp', defaultTempo:55, beats:[
+      {t:0.00,feet:['LH']},{t:0.22,feet:['LF']},{t:0.50,feet:['RH']},{t:0.72,feet:['RF']}
+    ]},
+    trot:{ label:'Kłus', defaultTempo:85, beats:[
+      {t:0.00,feet:['LH','RF']},{t:0.48,feet:['RH','LF']}
+    ]},
+    canter:{ label:'Galop', defaultTempo:100, beats:[
+      {t:0.00,feet:['LH']},{t:0.28,feet:['RH','LF']},{t:0.38,feet:['RF']}
+    ]},
+    gallop:{ label:'Cwał', defaultTempo:120, beats:[
+      {t:0.00,feet:['LH']},{t:0.12,feet:['RH']},{t:0.42,feet:['LF']},{t:0.55,feet:['RF']}
+    ]}
+  };
+
+  const FOOT_PROFILES={
+    LF:{pan:-0.48,pitch:1.035,gain:0.96,body:1.04,transient:1.10},
+    RF:{pan:0.48,pitch:1.035,gain:0.96,body:1.04,transient:1.10},
+    LH:{pan:-0.30,pitch:0.965,gain:1.08,body:1.16,transient:0.92},
+    RH:{pan:0.30,pitch:0.965,gain:1.08,body:1.16,transient:0.92}
+  };
+
+  let currentGait='walk', samples=[], samplesExpanded=false, audioCtx=null;
+  let lastSchedule=[], playSources=[], isPlaying=false;
+  let playCtxStartTime=0, playPausedOffset=0, playEndTimer=null, playheadRAF=null;
+  let seed=Math.floor(Math.random()*0xffffffff)>>>0, rngState=seed;
+  let sampleBag=[], variantCounter=1;
+  const SAMPLE_PREVIEW_COUNT=3;
+
+  // Płynna animacja rozwijania/zwijania sekcji "Ustawienia zaawansowane".
+  // Natywny <details> pokazuje/ukrywa zawartość skokowo, więc przechwytujemy
+  // klik na <summary> i animujemy wysokość elementu przez Web Animations API,
+  // dopiero na końcu ustawiając właściwy atrybut open/closed.
+  (function setupAnimatedAdvanced(){
+    const details=document.querySelector('details.advanced');
+    if(!details) return;
+    const summary=details.querySelector(':scope > summary');
+    const body=details.querySelector(':scope > .advanced-body');
+    let animation=null, isClosing=false, isExpanding=false;
+
+    summary.addEventListener('click',e=>{
+      e.preventDefault();
+      details.style.overflow='hidden';
+      if(isClosing || !details.open){ openPanel(); }
+      else if(isExpanding || details.open){ shrinkPanel(); }
+    });
+
+    function shrinkPanel(){
+      isClosing=true; details.classList.remove('is-anim-open');
+      const startHeight=`${details.offsetHeight}px`;
+      const endHeight=`${summary.offsetHeight}px`;
+      if(animation) animation.cancel();
+      animation=details.animate({height:[startHeight,endHeight]},{duration:280,easing:'cubic-bezier(.4,0,.2,1)'});
+      animation.onfinish=()=>onFinish(false);
+      animation.oncancel=()=>{isClosing=false;};
+    }
+
+    function openPanel(){
+      details.style.height=`${details.offsetHeight}px`;
+      details.open=true; details.classList.add('is-anim-open');
+      requestAnimationFrame(()=>expandPanel());
+    }
+
+    function expandPanel(){
+      isExpanding=true;
+      const startHeight=`${details.offsetHeight}px`;
+      const endHeight=`${summary.offsetHeight+body.offsetHeight}px`;
+      if(animation) animation.cancel();
+      animation=details.animate({height:[startHeight,endHeight]},{duration:280,easing:'cubic-bezier(.4,0,.2,1)'});
+      animation.onfinish=()=>onFinish(true);
+      animation.oncancel=()=>{isExpanding=false;};
+    }
+
+    function onFinish(isOpen){
+      details.open=isOpen; details.classList.toggle('is-anim-open',isOpen);
+      animation=null; isClosing=false; isExpanding=false;
+      details.style.height=''; details.style.overflow='';
+    }
+  })();
+
+  const el=id=>document.getElementById(id);
+  const dropZone=el('drop'), fileInput=el('fileInput'), sampleListEl=el('sampleList'), toggleSamplesBtn=el('toggleSamplesBtn'), clearAllBtn=el('clearAllBtn');
+  const uploadModeOverlay=el('uploadModeOverlay'), uploadModeSingle=el('uploadModeSingle'), uploadModeMulti=el('uploadModeMulti'), uploadModeCancel=el('uploadModeCancel');
+  const gaitsEl=el('gaits'), tempoSlider=el('tempo'), durationSlider=el('duration'), jitterSlider=el('jitter');
+  const volJitterSlider=el('volJitter'), pitchJitterSlider=el('pitchJitter'), tempoDriftSlider=el('tempoDrift');
+  const panStrengthSlider=el('panStrength');
+  const massSlider=el('mass'), energySlider=el('energy'), sampleVariantSlider=el('sampleVariant');
+  const transientSlider=el('transient'), bodySlider=el('body');
+  const masterVolumeSlider=el('masterVolume'), wavFormat=el('wavFormat'), leadSelect=el('leadSelect'), leadField=el('leadField');
+  const fileFormat=el('fileFormat'), mp3Bitrate=el('mp3Bitrate'), wavQualityField=el('wavQualityField'), mp3QualityField=el('mp3QualityField');
+  const transitionMode=el('transitionMode'), tempoChangeSlider=el('tempoChange'), tempoChangeTimeSlider=el('tempoChangeTime'), transitionAtSlider=el('transitionAt'), transitionDurSlider=el('transitionDur');
+  const speedSlider=el('speed'), strideLengthSlider=el('strideLength'), cycleCorrelationSlider=el('cycleCorrelation'), dissociationSlider=el('dissociation'), suspensionSlider=el('suspension'), cycleStabilitySlider=el('cycleStability');
+  const playBtn=el('playBtn'), rerollBtn=el('rerollBtn'), renderBtn=el('renderBtn'), statusEl=el('status'), variantStatus=el('variantStatus');
+  const canvas=el('timeline'), ctx2d=canvas.getContext('2d');
+  const sampleCountLabel=el('sampleCountLabel'), bigTempo=el('bigTempo'), stopVisualBtn=el('stopVisual'), bigTime=el('bigTime');
+  const playheadEl=el('playhead');
+
+  function getAudioCtx(){ if(!audioCtx) audioCtx=new (window.AudioContext||window.webkitAudioContext)(); return audioCtx; }
+  function rand(){ rngState=(Math.imul(rngState,1664525)+1013904223)>>>0; return rngState/4294967296; }
+  function randSigned(){ return rand()*2-1; }
+  function clamp(v,a,b){ return Math.max(a,Math.min(b,v)); }
+  function gaussian(){
+    let u=0,v=0; while(u===0)u=rand(); while(v===0)v=rand();
+    return Math.sqrt(-2*Math.log(u))*Math.cos(2*Math.PI*v);
+  }
+  function smooth(prev,target,amount){ return prev+(target-prev)*amount; }
+  function reseed(){ seed=Math.floor(Math.random()*0xffffffff)>>>0; rngState=seed; sampleBag=[]; variantCounter++; variantStatus.textContent=`Wariant #${variantCounter} • seed ${seed}`; }
+  function resetRng(){ rngState=seed; sampleBag=[]; }
+
+  function formatTime(t){ t=Math.max(0,t); const m=Math.floor(t/60), s=t-m*60; return `${m}:${s.toFixed(2).padStart(5,'0')}`; }
+  function updateBigTime(pos){ if(bigTime) bigTime.textContent=formatTime(pos); }
+
+  function updateVals(){
+    el('tempoVal').textContent=tempoSlider.value; el('durVal').textContent=durationSlider.value;
+    el('jitterVal').textContent=jitterSlider.value; el('volVal').textContent=volJitterSlider.value;
+    el('pitchVal').textContent=pitchJitterSlider.value; el('driftVal').textContent=tempoDriftSlider.value;
+    el('panStrengthVal').textContent=panStrengthSlider.value;
+    el('massVal').textContent=massSlider.value; el('energyVal').textContent=energySlider.value; el('variantVal').textContent=sampleVariantSlider.value;
+    el('transientVal').textContent=transientSlider.value; el('bodyVal').textContent=bodySlider.value;
+    el('tempoChangeVal').textContent=tempoChangeSlider.value; el('tempoChangeTimeVal').textContent=(+tempoChangeTimeSlider.value).toFixed(1); el('transitionAtVal').textContent=(+transitionAtSlider.value).toFixed(1); el('transitionDurVal').textContent=(+transitionDurSlider.value).toFixed(1);
+    el('speedVal').textContent=speedSlider.value; el('strideVal').textContent=strideLengthSlider.value; el('correlationVal').textContent=cycleCorrelationSlider.value; el('dissociationVal').textContent=dissociationSlider.value; el('suspensionVal').textContent=suspensionSlider.value; el('cycleStabilityVal').textContent=cycleStabilitySlider.value;
+    const db=parseFloat(masterVolumeSlider.value); el('masterVolVal').textContent=(db>0?'+':'')+db.toFixed(1).replace('.0','');
+    if(bigTempo) bigTempo.textContent=Math.round(+tempoSlider.value);
+  }
+
+  function invalidateVariant(){ hardResetPlayback(); buildSchedule(); drawTimeline(); }
+  [tempoSlider,durationSlider,jitterSlider,volJitterSlider,pitchJitterSlider,tempoDriftSlider,panStrengthSlider,massSlider,energySlider,sampleVariantSlider,transientSlider,bodySlider,tempoChangeSlider,tempoChangeTimeSlider,transitionAtSlider,transitionDurSlider,speedSlider,strideLengthSlider,cycleCorrelationSlider,dissociationSlider,suspensionSlider,cycleStabilitySlider].forEach(s=>s.addEventListener('input',()=>{updateVals();invalidateVariant();}));
+  masterVolumeSlider.addEventListener('input',updateVals);
+  wavFormat.addEventListener('change',()=>setStatus('Format eksportu zmieniony.'));
+  function updateFormatFieldsVisibility(){
+    const isMp3=fileFormat.value==='mp3';
+    wavQualityField.style.display=isMp3?'none':'';
+    mp3QualityField.style.display=isMp3?'':'none';
+  }
+  fileFormat.addEventListener('change',()=>{updateFormatFieldsVisibility();setStatus('Format pliku zmieniony na '+(fileFormat.value==='mp3'?'MP3':'WAV')+'.');});
+  mp3Bitrate.addEventListener('change',()=>setStatus('Jakość MP3 zmieniona.'));
+  updateFormatFieldsVisibility();
+  leadSelect.addEventListener('change',()=>{invalidateVariant();});
+  [transitionMode].forEach(s=>s.addEventListener('change',()=>{updateVals();invalidateVariant();}));
+
+  function selectGait(g){
+    currentGait=g; [...gaitsEl.children].forEach(b=>b.classList.toggle('active',b.dataset.gait===g));
+    tempoSlider.value=GAITS[g].defaultTempo; leadField.style.display=(g==='canter'||g==='gallop')?'block':'none';
+    updateVals(); invalidateVariant();
+  }
+  gaitsEl.addEventListener('click',e=>{const b=e.target.closest('.gait-btn');if(b)selectGait(b.dataset.gait);}); selectGait('walk');
+
+  // Przycisk "Domyślne" przy każdym kafelku — przywraca suwaki/selecty tego
+  // kafelka do wartości, z jakimi strona się wczytała (HTMLInputElement.defaultValue
+  // i <option selected> odzwierciedlają oryginalny atrybut z znacznika, więc
+  // nie trzeba osobno trzymać tabeli wartości domyślnych).
+  function resetTileControls(root){
+    root.querySelectorAll('input[type=range]').forEach(inp=>{
+      inp.value=inp.defaultValue;
+      inp.dispatchEvent(new Event('input',{bubbles:true}));
+    });
+    root.querySelectorAll('select').forEach(sel=>{
+      const def=[...sel.options].find(o=>o.defaultSelected)||sel.options[0];
+      sel.value=def.value;
+      sel.dispatchEvent(new Event('change',{bubbles:true}));
+    });
+  }
+  document.querySelectorAll('.reset-tile-btn').forEach(btn=>{
+    btn.addEventListener('click',()=>{
+      const tile=btn.closest('.section');
+      if(btn.dataset.reset==='chod') selectGait('walk');
+      resetTileControls(tile);
+      setStatus('Przywrócono domyślne ustawienia tego kafelka.');
+    });
+  });
+
+  // Asks the user, via a modal, whether the files about to be uploaded contain one
+  // hoof-hit per file or several hits per file. Resolves to 'single', 'multi', or
+  // null if the user cancels (in which case the upload is aborted). Picking the wrong
+  // option previously caused single-hit files to be mangled by the multi-hit splitter
+  // (visible-but-silent gaps on the timeline), so this choice is now made explicit
+  // per upload instead of relying on a persistent checkbox.
+  function askUploadMode(){
+    return new Promise(resolve=>{
+      uploadModeOverlay.style.display='flex';
+      function cleanup(result){
+        uploadModeOverlay.style.display='none';
+        uploadModeSingle.removeEventListener('click',onSingle);
+        uploadModeMulti.removeEventListener('click',onMulti);
+        uploadModeCancel.removeEventListener('click',onCancel);
+        uploadModeOverlay.removeEventListener('click',onOverlay);
+        resolve(result);
+      }
+      function onSingle(){cleanup('single');}
+      function onMulti(){cleanup('multi');}
+      function onCancel(){cleanup(null);}
+      function onOverlay(e){ if(e.target===uploadModeOverlay) cleanup(null); }
+      uploadModeSingle.addEventListener('click',onSingle);
+      uploadModeMulti.addEventListener('click',onMulti);
+      uploadModeCancel.addEventListener('click',onCancel);
+      uploadModeOverlay.addEventListener('click',onOverlay);
+    });
+  }
+
+  async function pickFilesAndAsk(fileList){
+    const files=[...fileList];
+    if(!files.length)return;
+    const mode=await askUploadMode();
+    if(mode===null){ setStatus('Anulowano wgrywanie próbek.'); fileInput.value=''; return; }
+    handleFiles(files, mode==='multi');
+  }
+
+  dropZone.addEventListener('click',()=>fileInput.click());
+  dropZone.addEventListener('dragover',e=>{e.preventDefault();dropZone.classList.add('drag');});
+  dropZone.addEventListener('dragleave',()=>dropZone.classList.remove('drag'));
+  dropZone.addEventListener('drop',e=>{e.preventDefault();dropZone.classList.remove('drag');pickFilesAndAsk(e.dataTransfer.files);});
+  fileInput.addEventListener('change',e=>pickFilesAndAsk(e.target.files));
+
+  // --- Robust sample loading / analysis ---
+  // A damaged, huge or unusual file must never freeze the UI.
+  const MAX_FILE_MB = 120;
+  const MAX_SAMPLE_SECONDS = 120;
+  const DECODE_TIMEOUT_MS = 15000;
+  const ANALYSIS_SCAN_SECONDS = 2.5;
+  const ANALYSIS_CHUNK = 180000;
+  // --- Multi-hit detection (splitting one long recording into many individual hoof-hit samples) ---
+  const HIT_FRAME_S = 0.002;      // envelope frame size used for onset scanning
+  const HIT_HOLD_S = 0.03;        // how long the signal must stay quiet before we consider a hit "finished" and re-arm for the next one
+  const HIT_MAX_SEG_S = 1.5;      // hard cap on how long a single split-out hit can be
+  const HIT_LOOKBACK_S = 0.015;   // how far back we search for the precise attack sample
+  const HIT_MAX_COUNT = 300;      // sanity cap on number of hits split from one file
+  const HIT_GAP_PAD_S = 0.004;    // tiny gap left before the next hit's attack
+
+  function wait(ms){ return new Promise(resolve=>setTimeout(resolve,ms)); }
+
+  async function withTimeout(promise, ms, label){
+    let timer;
+    try{
+      return await Promise.race([
+        promise,
+        new Promise((_, reject)=>{ timer=setTimeout(()=>reject(new Error(`${label} — przekroczono ${Math.round(ms/1000)} s.`)),ms); })
+      ]);
+    }finally{ clearTimeout(timer); }
+  }
+
+  async function readFileSafely(file){
+    return withTimeout(file.arrayBuffer(), DECODE_TIMEOUT_MS, 'Odczyt pliku trwa zbyt długo');
+  }
+
+  async function decodeAudioSafely(arrayBuf, fileName){
+    const ctx=getAudioCtx();
+    if(!ctx || typeof ctx.decodeAudioData!=='function') throw new Error('Przeglądarka nie udostępnia dekodowania audio.');
+    const decoded=await withTimeout(ctx.decodeAudioData(arrayBuf.slice(0)),DECODE_TIMEOUT_MS,`Nie udało się zdekodować „${fileName}”`);
+    if(!decoded || !Number.isFinite(decoded.duration) || decoded.duration<=0 || decoded.length<=0) throw new Error('Plik nie zawiera prawidłowych danych audio.');
+    if(decoded.duration>MAX_SAMPLE_SECONDS) throw new Error(`Próbka jest zbyt długa (${decoded.duration.toFixed(1)} s; limit ${MAX_SAMPLE_SECONDS} s).`);
+    if(decoded.numberOfChannels<1 || decoded.numberOfChannels>32) throw new Error(`Nietypowa liczba kanałów: ${decoded.numberOfChannels}.`);
+    return decoded;
+  }
+
+  // Analysis is deliberately asynchronous. Large/high-sample-rate files are processed
+  // in small chunks so the browser can repaint and the UI can never look permanently frozen.
+  async function preprocessBuffer(buffer, progressCb){
+    if(!buffer || !buffer.numberOfChannels || !buffer.length || !Number.isFinite(buffer.sampleRate)) throw new Error('Nieprawidłowy bufor audio.');
+    const sr=buffer.sampleRate, channels=buffer.numberOfChannels;
+    const scanSamples=Math.min(buffer.length,Math.max(1,Math.floor(sr*ANALYSIS_SCAN_SECONDS)));
+    const win=Math.max(32,Math.min(Math.floor(sr*0.003),2048));
+    const step=Math.max(win,Math.floor(sr*0.012));
+    const threshold=0.006;
+    const data=[];
+    for(let c=0;c<channels;c++) data.push(buffer.getChannelData(c));
+
+    const windowLevel=(index)=>{
+      const end=Math.min(buffer.length,index+win), count=end-index;
+      if(count<=0)return 0;
+      let sum=0;
+      for(let c=0;c<channels;c++){
+        const d=data[c];
+        for(let i=index;i<end;i++) sum+=Math.abs(Number.isFinite(d[i])?d[i]:0);
+      }
+      return sum/(count*channels);
+    };
+
+    let start=0;
+    const firstPositions=[];
+    for(let i=0;i<scanSamples;i+=step) firstPositions.push(i);
+    for(let n=0;n<firstPositions.length;n++){
+      if(windowLevel(firstPositions[n])>threshold){ start=Math.max(0,firstPositions[n]-Math.floor(sr*0.003)); break; }
+      if((n%8)===0){ progressCb?.(25*n/Math.max(1,firstPositions.length)); await wait(0); }
+    }
+
+    let end=buffer.length-1;
+    const tailStart=Math.max(0,buffer.length-scanSamples);
+    const lastPositions=[];
+    for(let i=Math.max(tailStart,buffer.length-win);i>=tailStart;i-=step) lastPositions.push(i);
+    for(let n=0;n<lastPositions.length;n++){
+      if(windowLevel(lastPositions[n])>threshold){ end=Math.min(buffer.length-1,lastPositions[n]+win+Math.floor(sr*0.008)); break; }
+      if((n%8)===0){ progressCb?.(25+25*n/Math.max(1,lastPositions.length)); await wait(0); }
+    }
+
+    if(end<=start+16){start=0;end=buffer.length-1;}
+    const out=await finalizeSegment(data,channels,sr,start,end,progressCb);
+    return {buffer:out.buffer,trimStart:start/sr,trimmed:Math.max(0,buffer.duration-out.buffer.duration),peak:out.peak};
+  }
+
+  // Copies [start,end] (inclusive) out of the per-channel `data` arrays into a fresh,
+  // peak-normalized AudioBuffer. Shared by both the single-sample trim path and the
+  // multi-hit splitter below. Chunked so a big source file never freezes the UI.
+  async function finalizeSegment(data,channels,sr,start,end,progressCb){
+    const length=end-start+1;
+    if(length<=16) throw new Error('Wycięty fragment jest zbyt krótki lub pusty.');
+    const out=getAudioCtx().createBuffer(channels,length,sr);
+    let peak=0;
+    for(let base=0;base<length;base+=ANALYSIS_CHUNK){
+      const stop=Math.min(length,base+ANALYSIS_CHUNK);
+      for(let c=0;c<channels;c++){
+        const src=data[c], dst=out.getChannelData(c);
+        for(let i=base;i<stop;i++){
+          const v=Number.isFinite(src[start+i])?src[start+i]:0;
+          dst[i]=v; peak=Math.max(peak,Math.abs(v));
+        }
+      }
+      progressCb?.(50+45*stop/length);
+      await wait(0);
+    }
+    if(!Number.isFinite(peak)) throw new Error('Fragment zawiera nieprawidłowe wartości audio.');
+    const scale=peak>1e-8?Math.min(Math.pow(10,-1/20)/peak,4):1;
+    if(scale!==1){
+      for(let base=0;base<length;base+=ANALYSIS_CHUNK){
+        const stop=Math.min(length,base+ANALYSIS_CHUNK);
+        for(let c=0;c<channels;c++){
+          const d=out.getChannelData(c);
+          for(let i=base;i<stop;i++) d[i]*=scale;
+        }
+        progressCb?.(95+5*stop/length); await wait(0);
+      }
+    }
+    return {buffer:out,peak};
+  }
+
+  // Scans a (potentially long) recording for multiple isolated hoof-hit transients and
+  // returns their [start,end] sample ranges. Returns [] if fewer than two hits are found,
+  // in which case the caller should fall back to treating the whole file as one sample.
+  async function detectHits(buffer, progressCb){
+    const sr=buffer.sampleRate, channels=buffer.numberOfChannels, len=buffer.length;
+    const data=[]; for(let c=0;c<channels;c++) data.push(buffer.getChannelData(c));
+    const hop=Math.max(8,Math.round(sr*HIT_FRAME_S));
+    const numFrames=Math.ceil(len/hop);
+    const env=new Float32Array(numFrames);
+    for(let fi=0,base=0;fi<numFrames;fi++,base+=hop){
+      const stop=Math.min(len,base+hop); let sum=0,count=0;
+      for(let c=0;c<channels;c++){ const d=data[c]; for(let i=base;i<stop;i++){ sum+=Math.abs(d[i]||0); count++; } }
+      env[fi]=count>0?sum/count:0;
+      if((fi%4000)===0){ progressCb?.(10*fi/numFrames); await wait(0); }
+    }
+    // Adaptive noise floor via a coarse percentile of the envelope.
+    const sample=[]; for(let i=0;i<env.length;i+=Math.max(1,Math.floor(env.length/4000))) sample.push(env[i]);
+    sample.sort((a,b)=>a-b);
+    const floor=sample.length?sample[Math.floor(sample.length*0.35)]:0;
+    const threshHigh=Math.max(floor*4.5,0.006);
+    const threshLow=Math.max(floor*1.6,0.0022);
+    const holdFrames=Math.max(1,Math.round(HIT_HOLD_S*sr/hop));
+    const maxSegFrames=Math.max(holdFrames+1,Math.round(HIT_MAX_SEG_S*sr/hop));
+    const lookbackSamples=Math.max(hop,Math.round(HIT_LOOKBACK_S*sr));
+    const gapPadSamples=Math.round(HIT_GAP_PAD_S*sr);
+
+    // Single state machine pass: once a hit is triggered we stay "inside" it — ignoring
+    // further threshold crossings — until the envelope has stayed quiet for HIT_HOLD_S
+    // (or the max segment length is hit). This avoids re-triggering on the noisy decay
+    // tail of a single hoof strike, which would otherwise look like several extra hits.
+    const onsetFrames=[]; const endFrames=[];
+    let state='idle', onsetFrame=-1, quietRun=0;
+    for(let fi=0;fi<numFrames;fi++){
+      if(state==='idle'){
+        if(env[fi]>=threshHigh && onsetFrames.length<HIT_MAX_COUNT){ onsetFrames.push(fi); onsetFrame=fi; state='hit'; quietRun=0; }
+      }else{
+        if(env[fi]<threshLow) quietRun++; else quietRun=0;
+        if(quietRun>=holdFrames || (fi-onsetFrame)>=maxSegFrames){ endFrames.push(fi); state='idle'; }
+      }
+      if((fi%4000)===0){ progressCb?.(15*fi/numFrames); await wait(0); }
+    }
+    if(state==='hit') endFrames.push(numFrames-1);
+    if(onsetFrames.length<2) return [];
+
+    const segments=[];
+    for(let oi=0;oi<onsetFrames.length;oi++){
+      const frameStart=onsetFrames[oi]*hop;
+      // Backtrack sample-by-sample to find the precise attack point.
+      let attack=frameStart;
+      const backLimit=Math.max(0,frameStart-lookbackSamples);
+      for(let i=frameStart;i>backLimit;i--){
+        let mag=0; for(let c=0;c<channels;c++) mag=Math.max(mag,Math.abs(data[c][i]||0));
+        if(mag<threshLow){ attack=i; break; }
+        attack=i;
+      }
+      const rawEnd=Math.min(len-1,(endFrames[oi]||numFrames-1)*hop+gapPadSamples);
+      const end=Math.min(rawEnd,len-1);
+      if(end>attack+16) segments.push([attack,end]);
+      if((oi%20)===0){ progressCb?.(20+70*oi/onsetFrames.length); await wait(0); }
+    }
+    progressCb?.(90);
+    return segments.length>=2?segments:[];
+  }
+
+  // High-level helper: attempts to split `buffer` into several individually-normalized
+  // hit samples. Returns an array of {buffer,trimStart,trimmed,peak} (one per detected hit),
+  // or null if fewer than two distinct hits were found (caller should fall back to preprocessBuffer).
+  async function splitMultiHit(buffer, progressCb){
+    if(!buffer || !buffer.numberOfChannels || !buffer.length || !Number.isFinite(buffer.sampleRate)) throw new Error('Nieprawidłowy bufor audio.');
+    const sr=buffer.sampleRate, channels=buffer.numberOfChannels;
+    const segments=await detectHits(buffer, pct=>progressCb?.(pct*0.5));
+    if(!segments.length) return null;
+    const data=[]; for(let c=0;c<channels;c++) data.push(buffer.getChannelData(c));
+    const results=[];
+    for(let i=0;i<segments.length;i++){
+      const [start,end]=segments[i];
+      const out=await finalizeSegment(data,channels,sr,start,end, pct=>progressCb?.(50+(50*(i+pct/100)/segments.length)));
+      results.push({buffer:out.buffer,trimStart:start/sr,trimmed:0,peak:out.peak});
+    }
+    return results;
+  }
+
+  async function handleFiles(fileList, multiHitMode){
+    const candidates=[...fileList];
+    const files=candidates.filter(f=>f.type.startsWith('audio/')||/\.(wav|mp3|m4a|aiff|aif|ogg|flac)$/i.test(f.name));
+    if(!files.length){setStatus('Nie znaleziono obsługiwanych plików audio.');return;}
+
+    const failures=[];
+    let loadedThisBatch=0, splitFilesCount=0, splitHitsTotal=0;
+    setStatus(`Wczytywanie próbek… 0/${files.length}`);
+
+    try{
+      for(let i=0;i<files.length;i++){
+        const f=files[i];
+        setStatus(`Wczytywanie i analiza próbki ${i+1}/${files.length}: ${f.name}`);
+        try{
+          if(f.size>MAX_FILE_MB*1024*1024){
+            throw new Error(`plik ma ${(f.size/1024/1024).toFixed(1)} MB; limit to ${MAX_FILE_MB} MB`);
+          }
+          const arrayBuf=await readFileSafely(f);
+          const raw=await decodeAudioSafely(arrayBuf,f.name);
+          let multi=null;
+          if(multiHitMode){
+            multi=await splitMultiHit(raw, pct=>{ if(pct>=0) setStatus(`Szukanie uderzeń w pliku ${i+1}/${files.length}: ${f.name} (${Math.round(pct)}%)`); });
+          }
+          if(multi && multi.length>=2){
+            multi.forEach((proc,hi)=>{ samples.push({name:`${f.name} — uderzenie ${hi+1}/${multi.length}`,buffer:proc.buffer,meta:proc}); });
+            splitFilesCount++; splitHitsTotal+=multi.length; loadedThisBatch+=multi.length;
+          }else{
+            const proc=await preprocessBuffer(raw, pct=>{ if(pct>=0) setStatus(`Wczytywanie i analiza próbki ${i+1}/${files.length}: ${f.name} (${Math.round(pct)}%)`); });
+            samples.push({name:f.name,buffer:proc.buffer,meta:proc});
+            loadedThisBatch++;
+          }
+        }catch(err){
+          const reason=err?.message||String(err)||'nieznany błąd';
+          failures.push(`${f.name}: ${reason}`);
+          console.warn('Pomijam nieprawidłową próbkę:',f.name,err);
+        }
+        // Give the browser a chance to repaint the progress/status between files.
+        await wait(0);
+      }
+    }catch(err){
+      console.error('Błąd modułu wczytywania próbek:',err);
+      failures.push(`Błąd modułu wczytywania: ${err?.message||err}`);
+    }finally{
+      try{
+        renderSampleList(); buildSchedule(); drawTimeline(); updateButtons();
+      }catch(err){
+        console.error('Błąd podczas budowania sekwencji po wczytaniu próbek:',err);
+        failures.push(`Błąd generowania sekwencji: ${err?.message||err}`);
+      }
+      fileInput.value='';
+    }
+
+    const splitNote=splitFilesCount>0?` Z ${splitFilesCount} plik${splitFilesCount===1?'u':'ów'} wykryto łącznie ${splitHitsTotal} uderzeń i rozdzielono je na osobne próbki.`:'';
+    if(loadedThisBatch>0 && failures.length===0){
+      setStatus(`Wczytano ${samples.length} ${samples.length===1?'próbkę':'próbek'}. Próbki są automatycznie przycinane i wyrównywane.${splitNote}`);
+    }else if(loadedThisBatch>0){
+      setStatus(`Wczytano ${samples.length} próbek. Pominięto ${failures.length} plik${failures.length===1?'':'ów'} — nietypowe lub uszkodzone próbki nie blokują aplikacji.${splitNote}`);
+      console.info('Szczegóły pominiętych plików:',failures);
+    }else{
+      setStatus('Nie udało się wczytać żadnej próbki. Sprawdź konsolę przeglądarki, aby zobaczyć szczegóły błędów.');
+      console.info('Szczegóły błędów wczytywania:',failures);
+    }
+  }
+
+  function renderSampleList(){
+    sampleListEl.innerHTML=''; const n=samplesExpanded?samples.length:Math.min(SAMPLE_PREVIEW_COUNT,samples.length);
+    samples.slice(0,n).forEach((s,i)=>sampleListEl.appendChild(makeSampleRow(s,i)));
+    if(samples.length>SAMPLE_PREVIEW_COUNT){toggleSamplesBtn.style.display='inline-block';toggleSamplesBtn.textContent=samplesExpanded?'Pokaż mniej':`Pokaż więcej (${samples.length-SAMPLE_PREVIEW_COUNT})`;}
+    else toggleSamplesBtn.style.display='none';
+    if(sampleCountLabel) sampleCountLabel.textContent=`${samples.length} ${samples.length===1?'plik':'plików'}`;
+    if(clearAllBtn) clearAllBtn.disabled=samples.length===0;
+  }
+  function makeSampleRow(s,i){
+    const li=document.createElement('li'); const dur=s.buffer.duration.toFixed(2); const trim=s.meta?.trimmed?` • przycięto ${s.meta.trimmed.toFixed(2)}s`:'';
+    li.innerHTML=`<span>${s.name} <span style="color:var(--text-muted)">(${dur}s${trim})</span></span>`;
+    const b=document.createElement('button');b.textContent='Usuń';b.title='Usuń próbkę';b.setAttribute('aria-label',`Usuń próbkę ${s.name}`);b.addEventListener('click',()=>{samples.splice(i,1);renderSampleList();buildSchedule();drawTimeline();updateButtons();});li.appendChild(b);return li;
+  }
+  toggleSamplesBtn.addEventListener('click',()=>{samplesExpanded=!samplesExpanded;renderSampleList();});
+  clearAllBtn.addEventListener('click',()=>{
+    if(!samples.length)return;
+    const count=samples.length;
+    samples=[]; samplesExpanded=false; sampleBag=[];
+    renderSampleList(); buildSchedule(); drawTimeline(); updateButtons();
+    setStatus(`Usunięto wszystkie próbki (${count}).`);
+  });
+  function updateButtons(){const has=samples.length>0;playBtn.disabled=!has;renderBtn.disabled=!has;rerollBtn.disabled=!has;}
+  function setStatus(m){statusEl.textContent=m;}
+
+  function nextSampleIndex(){
+    if(samples.length===1)return 0;
+    if(sampleBag.length===0){sampleBag=[...samples.keys()]; for(let i=sampleBag.length-1;i>0;i--){const j=Math.floor(rand()*(i+1));[sampleBag[i],sampleBag[j]]=[sampleBag[j],sampleBag[i]];}}
+    return sampleBag.shift();
+  }
+  function mirrorFoot(foot){return ({LF:'RF',RF:'LF',LH:'RH',RH:'LH'})[foot]||foot;}
+
+  function proceduralVariant(){
+    const amount=+sampleVariantSlider.value/100;
+    return {offset:randSigned()*0.035*amount, rate:1+gaussian()*0.055*amount, gain:1+gaussian()*0.12*amount, low:1+gaussian()*0.22*amount, high:1+gaussian()*0.28*amount};
+  }
+
+  function buildSchedule(){
+    try{
+      buildScheduleInner();
+    }catch(err){
+      console.error('Błąd podczas generowania sekwencji kroków:',err);
+      lastSchedule=[];
+      setStatus(`Nie udało się wygenerować sekwencji: ${err?.message||err}. Sprawdź konsolę przeglądarki (F12).`);
+    }
+  }
+
+  function getTransitionGaits(){
+    const m=transitionMode.value;
+    const maps={
+      'none':[currentGait], 'walk-trot':['walk','trot'], 'trot-canter':['trot','canter'],
+      'canter-gallop':['canter','gallop'], 'walk-trot-canter':['walk','trot','canter'],
+      'custom':['walk','trot','canter','gallop']
+    }; return maps[m]||[currentGait];
+  }
+
+  function gaitAtTime(t,total){
+    const gs=getTransitionGaits();
+    if(gs.length===1)return {gait:gs[0],blend:0,next:null};
+
+    // Each consecutive gait transition lasts exactly the duration selected
+    // by the user. After the final transition, the sequence stays on the
+    // last gait for the remainder of the output.
+    const start=Math.min(+transitionAtSlider.value,total);
+    const tr=Math.max(.1,+transitionDurSlider.value);
+    if(t<=start)return {gait:gs[0],blend:0,next:gs[1]};
+
+    const raw=(t-start)/tr;
+    const idx=Math.min(gs.length-1,Math.floor(raw));
+    const frac=idx>=gs.length-1?0:clamp(raw-idx,0,1);
+    return {gait:gs[idx],blend:frac,next:gs[Math.min(gs.length-1,idx+1)]};
+  }
+
+  function tempoAtTime(t,total){
+    const base=+tempoSlider.value, change=+tempoChangeSlider.value/100, tc=Math.max(.1,+tempoChangeTimeSlider.value);
+    // Smooth acceleration/deceleration across the chosen time window.
+    const center=total*.5, half=Math.min(tc,total*.5);
+    const a=half>0?clamp((t-(center-half))/(2*half),0,1):1;
+    const smoothA=a*a*(3-2*a);
+    return base*(1+change*smoothA);
+  }
+
+  // ================================================================
+  // HORSE MOTION ENGINE
+  // Generates a coherent biomechanical motion cycle first. The audio
+  // engine later receives only the resulting foot-contact events.
+  // ================================================================
+  function smoothstep01(x){ x=clamp(x,0,1); return x*x*(3-2*x); }
+  function motionCurve(x){
+    // Slightly asymmetric ease: acceleration is decisive, settling is gentler.
+    x=clamp(x,0,1);
+    return x<0.5 ? 2*x*x : 1-Math.pow(-2*x+2,2)/2;
+  }
+  function gaitBeatMap(gaitName){
+    const beats=GAITS[gaitName].beats;
+    return beats.map((b,i)=>({phase:b.t, feet:b.feet.slice(), index:i}));
+  }
+  function naturalTransitionProfile(fromGait,toGait,p){
+    p=motionCurve(p);
+    if(!fromGait || !toGait || fromGait===toGait) return {phaseMorph:p, bridge:false};
+    // A dedicated bridge zone prevents a hard template swap.
+    const bridge = p>0.08 && p<0.92;
+    return {phaseMorph:p, bridge};
+  }
+
+  function generateMotionCycle(gaitName, cycleIndex, cycleStart, cycleDur, options){
+    const gait=GAITS[gaitName];
+    const events=[];
+    const from=options.fromGait||null, to=options.toGait||null, p=clamp(options.transitionProgress||0,0,1);
+    const natural=true;
+    const profile=naturalTransitionProfile(from,to,p);
+    const lead=leadSelect.value==='left';
+    const stability=options.stability;
+    const correlation=options.correlation;
+    const dissociationMs=options.dissociationMs;
+    const suspensionPct=options.suspensionPct;
+    const strideFactor=options.strideFactor;
+    const speedFactor=options.speedFactor;
+    const jitter=options.jitter;
+    const relativeJitter=jitter*(1-correlation);
+    const extremeJitter=jitter*(0.35+1.65*(1-correlation));
+
+    // Base pattern for the current gait. During a natural transition a short
+    // bridge shifts the temporal geometry toward the next gait while retaining
+    // the foot identity/order of the current cycle.
+    const source=gaitBeatMap(gaitName);
+    const target=to?gaitBeatMap(to):source;
+    const blend=natural?profile.phaseMorph:0;
+    const supportWindow=(gaitName==='canter'||gaitName==='gallop') ? 1-suspensionPct : 1;
+
+    const cycleDrift=clamp(1+gaussian()*options.drift*0.55,0.55,1.55);
+    const cycleJitter=gaussian()*extremeJitter*0.34;
+    options.nextCycleDrift=smooth(options.prevCycleDrift,cycleDrift,0.10+0.20*stability);
+    options.prevCycleDrift=options.nextCycleDrift;
+    options.nextCycleJitter=smooth(options.prevCycleJitter,cycleJitter,0.10+0.24*correlation);
+    options.prevCycleJitter=options.nextCycleJitter;
+
+    source.forEach((b,idx)=>{
+      let beatPhase=b.phase;
+      if(natural && to && blend>0){
+        // Match source beats to the closest target phase. This keeps each hoof
+        // attached to a plausible contact family while the cycle changes.
+        let best=target[0]; let bestD=Infinity;
+        for(const tb of target){
+          const d=Math.abs(tb.phase-b.phase); if(d<bestD){bestD=d;best=tb;}
+        }
+        beatPhase=b.phase*(1-blend)+best.phase*blend;
+      }
+      if((gaitName==='canter'||gaitName==='gallop')&&suspensionPct>0) beatPhase*=supportWindow;
+
+      let feet=b.feet.slice();
+      if((gaitName==='canter'||gaitName==='gallop')&&lead) feet=feet.map(f=>({LF:'RF',RF:'LF',LH:'RH',RH:'LH'})[f]||f);
+
+      const sharedJ=gaussian()*extremeJitter*0.50 + options.prevCycleJitter;
+      const baseTime=cycleStart+beatPhase*cycleDur+sharedJ;
+      feet.forEach((foot,fi)=>{
+        let intra=0;
+        if(feet.length>1){
+          // Controlled diagonal dissociation, reduced as correlation increases.
+          const dir=fi===0?-1:1;
+          intra=dir*dissociationMs*(0.25+0.75*(1-correlation))*(0.55+0.45*rand());
+        }
+        const localTime=baseTime+intra+gaussian()*extremeJitter*0.40;
+        if(localTime<0||localTime>+durationSlider.value)return;
+        events.push({
+          foot,
+          time:localTime,
+          phase:beatPhase,
+          cycle:cycleIndex,
+          sourceGait:gaitName,
+          targetGait:to,
+          transitionProgress:blend,
+          bridge:profile.bridge,
+          suspension:(gaitName==='canter'||gaitName==='gallop'),
+          strideFactor,
+          speedFactor,
+          stability,
+          correlation,
+          dissociationMs
+        });
+      });
+    });
+
+    // During the middle of a natural transition, add a single target-gait
+    // anticipation contact only when it does not collide with an existing one.
+    // This is the key part of the motion engine: the horse begins to adopt the
+    // next foot pattern before the old pattern disappears completely.
+    if(natural && to && profile.bridge && blend>0.52){
+      const anticipation=target[Math.min(target.length-1,Math.floor((blend-0.52)/(0.48)*target.length))];
+      if(anticipation){
+        const t=cycleStart+anticipation.phase*cycleDur;
+        const existing=events.some(e=>Math.abs(e.time-t)<0.045 && e.foot===anticipation.feet[0]);
+        if(!existing){
+          let af=anticipation.feet[0];
+          if((to==='canter'||to==='gallop')&&lead) af=({LF:'RF',RF:'LF',LH:'RH',RH:'LH'})[af]||af;
+          events.push({foot:af,time:t,phase:anticipation.phase,cycle:cycleIndex,sourceGait:gaitName,targetGait:to,transitionProgress:blend,bridge:true,anticipation:true,strideFactor,speedFactor,stability,correlation,dissociationMs});
+        }
+      }
+    }
+    return events;
+  }
+
+  function buildScheduleInner(){
+    resetRng(); lastSchedule=[]; if(!samples.length)return;
+    const totalDuration=+durationSlider.value;
+    const jitter=+jitterSlider.value/1000, volJ=+volJitterSlider.value/100, pitchJ=+pitchJitterSlider.value/100, drift=+tempoDriftSlider.value/100;
+    const energy=Math.pow(+energySlider.value/60,0.82), massFactor=Math.pow(clamp(+massSlider.value/500,0.20,3.0),0.62);
+    const speedFactor=+speedSlider.value/100, strideFactor=+strideLengthSlider.value/100;
+    const correlation=+cycleCorrelationSlider.value/100, dissociationMs=+dissociationSlider.value/1000;
+    const stability=+cycleStabilitySlider.value/100, suspensionPct=+suspensionSlider.value/100;
+    const lead=leadSelect.value==='left', panStrength=+panStrengthSlider.value/100;
+    let cursor=0, cycleIndex=0, strideEnergy=1, strideTone=1, prevCycleDrift=1, prevCycleJitter=0;
+
+    while(cursor<totalDuration){
+      const atStart=gaitAtTime(cursor,totalDuration);
+      const gaitName=atStart.gait, tempo=tempoAtTime(cursor,totalDuration);
+      const strideBase=60/Math.max(20,tempo);
+      // Speed changes the cadence only modestly; stride length carries most of
+      // the forward-motion character, so tempo remains the musical control.
+      const cadenceFactor=clamp(1/Math.pow(Math.max(0.2,speedFactor),0.72),0.62,1.72);
+      const strideCadence=clamp(1/Math.pow(Math.max(0.35,strideFactor),0.38),0.73,1.38);
+      const strideDur=strideBase*cadenceFactor*strideCadence;
+      const start=+transitionAtSlider.value, tr=Math.max(.1,+transitionDurSlider.value);
+      const gs=getTransitionGaits();
+      let nextGait=null, transitionProgress=0;
+      if(gs.length>1 && true){
+        const raw=(cursor-start)/tr;
+        const idx=Math.min(gs.length-1,Math.max(0,Math.floor(raw)));
+        nextGait=gs[Math.min(gs.length-1,idx+1)];
+        transitionProgress=idx>=gs.length-1?0:clamp(raw-idx,0,1);
+      }
+
+      const motionOptions={fromGait:gaitName,toGait:nextGait,transitionProgress,stability,correlation,dissociationMs,suspensionPct,strideFactor,speedFactor,jitter,drift,prevCycleDrift,prevCycleJitter,nextCycleDrift:prevCycleDrift,nextCycleJitter:prevCycleJitter};
+      const motionEvents=generateMotionCycle(gaitName,cycleIndex,cursor,strideDur,motionOptions);
+      prevCycleDrift=motionOptions.prevCycleDrift; prevCycleJitter=motionOptions.prevCycleJitter;
+
+      strideEnergy=clamp(smooth(strideEnergy,1+gaussian()*volJ*0.30,0.16*stability+0.05),0.72,1.30);
+      strideTone=clamp(smooth(strideTone,1+gaussian()*pitchJ*0.30,0.16*stability+0.05),0.94,1.06);
+      const strideEnergyFactor=0.45+0.55*strideFactor+0.45*Math.max(0,speedFactor-1)+0.22*Math.max(0,1-speedFactor);
+
+      motionEvents.forEach(m=>{
+        const idx=nextSampleIndex(), profile=FOOT_PROFILES[m.foot], pv=proceduralVariant();
+        const anticipationBoost=m.anticipation?1.035:1;
+        const localVol=clamp(strideEnergy*strideEnergyFactor*anticipationBoost*(1+gaussian()*volJ*0.55)*energy*massFactor*(0.62+0.38*speedFactor),0.03,4.5);
+        const rate=clamp(profile.pitch*strideTone*(1+gaussian()*pitchJ*0.55)*pv.rate*Math.pow(speedFactor,0.10)*Math.pow(strideFactor,0.05),0.45,1.75);
+        const filter=clamp(10500*strideTone*pv.high*Math.pow(speedFactor,0.22)*Math.pow(strideFactor,0.10),1300,22000);
+        const pan=clamp(profile.pan*panStrength+gaussian()*0.028*panStrength,-1,1);
+        lastSchedule.push({time:m.time,sampleIndex:idx,gain:Math.max(.025,profile.gain*localVol*pv.gain),rate,pan,filterFreq:filter,foot:m.foot,beat:m.cycle,variant:pv,massFactor,transient:clamp((+transientSlider.value/55)*profile.transient*(0.76+0.24*strideFactor),0,4.5),body:clamp((+bodySlider.value/60)*profile.body*(0.70+0.30*strideFactor),0,4.0),tempo,transition:gaitName,strideFactor,speedFactor,suspensionPct,correlation,dissociationMs,transitionProgress:m.transitionProgress||0,anticipation:!!m.anticipation});
+      });
+      cursor+=strideDur; cycleIndex++;
+      if(cycleIndex>2000)break;
+    }
+    lastSchedule.sort((a,b)=>a.time-b.time);
+    const labels=getTransitionGaits().map(g=>GAITS[g].label).join(' → ');
+    variantStatus.textContent=`Wariant #${variantCounter} • seed ${seed} • ${labels}`;
+  }
+
+  function roundRect(ctx,x,y,w,h,r){
+    const rr=Math.min(r,w/2,h/2);
+    ctx.beginPath();
+    ctx.moveTo(x+rr,y);ctx.arcTo(x+w,y,x+w,y+h,rr);ctx.arcTo(x+w,y+h,x,y+h,rr);
+    ctx.arcTo(x,y+h,x,y,rr);ctx.arcTo(x,y,x+w,y,rr);ctx.closePath();
+  }
+
+  function drawTimeline(){
+    const w=canvas.width,h=canvas.height;ctx2d.clearRect(0,0,w,h);
+    const bg=ctx2d.createLinearGradient(0,0,0,h);
+    bg.addColorStop(0,'#161c1f');bg.addColorStop(1,'#0c1113');
+    ctx2d.fillStyle=bg;ctx2d.fillRect(0,0,w,h);
+    // subtle beat-grid
+    ctx2d.strokeStyle='rgba(255,255,255,.04)';ctx2d.lineWidth=1;
+    for(let gx=1;gx<16;gx++){const x=w*gx/16;ctx2d.beginPath();ctx2d.moveTo(x,0);ctx2d.lineTo(x,h);ctx2d.stroke();}
+    const dur=+durationSlider.value;if(!lastSchedule.length)return;
+    ctx2d.strokeStyle='rgba(240,184,92,.16)';ctx2d.beginPath();ctx2d.moveTo(0,h/2);ctx2d.lineTo(w,h/2);ctx2d.stroke();
+    const colors={LF:'#f0b85c',RF:'#ffc96f',LH:'#c77b54',RH:'#e0a06f'};
+    lastSchedule.forEach(hit=>{
+      const x=hit.time/dur*w, barH=Math.max(5,h*0.09+Math.min(hit.gain,3.2)*h*0.36), c=colors[hit.foot]||'#f0b85c';
+      ctx2d.fillStyle=c;ctx2d.shadowColor=c;ctx2d.shadowBlur=5;
+      roundRect(ctx2d,x-2.2,h/2-barH/2,4.4,barH,2.2);ctx2d.fill();
+    });
+    ctx2d.shadowBlur=0;
+  }
+
+  function setPlayheadPosition(frac){
+    if(!playheadEl)return;
+    const f=clamp(frac,0,1);
+    playheadEl.style.left=(f*100)+'%';
+    playheadEl.classList.toggle('active',f>0);
+  }
+  function startPlayheadAnim(dur){
+    if(!playheadEl)return; playheadEl.classList.add('active');
+    const frame=()=>{
+      if(!isPlaying)return;
+      const c=getAudioCtx(), pos=clamp(playPausedOffset+(c.currentTime-playCtxStartTime),0,dur);
+      setPlayheadPosition(dur>0?pos/dur:0); updateBigTime(pos);
+      playheadRAF=requestAnimationFrame(frame);
+    };
+    playheadRAF=requestAnimationFrame(frame);
+  }
+  function stopPlayheadAnim(){ if(playheadRAF)cancelAnimationFrame(playheadRAF); playheadRAF=null; }
+
+  function buildMasterChain(ctx,volumeFactor=1){
+    const input=ctx.createGain();
+    const bus=ctx.createGain(), comp=ctx.createDynamicsCompressor(), finalGain=ctx.createGain();
+    input.connect(bus).connect(comp).connect(finalGain).connect(ctx.destination);
+    comp.threshold.value=-3; comp.knee.value=5; comp.ratio.value=5; comp.attack.value=.003; comp.release.value=.16;
+    finalGain.gain.value=volumeFactor;
+    return {entry:input,bus,finalGain};
+  }
+
+  function scheduleHits(ctx,entry,t0,schedule,sampleArr){
+    const nodes=[];
+    schedule.forEach(hit=>{const sample=sampleArr[hit.sampleIndex],src=ctx.createBufferSource();src.buffer=sample.buffer;
+      const rate=hit.rate;
+      src.playbackRate.value=rate;
+      const hg=ctx.createGain(),hf=ctx.createBiquadFilter(),hs=ctx.createBiquadFilter(),hb=ctx.createBiquadFilter(),hp=ctx.createStereoPanner();
+      hg.gain.value=hit.gain; hf.type='lowpass'; hf.frequency.value=hit.filterFreq;
+      hs.type='highshelf'; hs.frequency.value=2600; hs.gain.value=(+transientSlider.value-50)*0.16*hit.transient;
+      hb.type='lowshelf'; hb.frequency.value=180; hb.gain.value=(+bodySlider.value-50)*0.13*hit.body;
+      hp.pan.value=hit.pan;
+      // A short attack/release envelope emphasizes the contact transient without replacing the source.
+      const now=t0+hit.time, attack=0.0012+0.0015*(1-clamp(+transientSlider.value/100,0,1)), release=0.045+0.055*(1-clamp(+bodySlider.value/100,0,1));
+      const dur=Math.max(0.08,Math.min(sample.buffer.duration/rate,1.4)); hg.gain.setValueAtTime(0.0001,now); hg.gain.linearRampToValueAtTime(hit.gain*(0.78+hit.transient*.10),now+attack); hg.gain.setTargetAtTime(hit.gain,now+attack,0.006); hg.gain.setTargetAtTime(0.0001,now+Math.max(attack+0.012,dur-release),release);
+      src.connect(hg).connect(hs).connect(hb).connect(hf).connect(hp).connect(entry); src.start(now,Math.max(0,hit.variant.offset));
+      nodes.push(src);
+    }); return nodes;
+  }
+
+  function getOutputSpec(){const v=wavFormat.value;return v==='44'?{rate:44100,bits:16}:{rate:48000,bits:v==='24'?24:16};}
+  function getRenderSampleRate(){return fileFormat.value==='mp3'?44100:getOutputSpec().rate;}
+  function getChannelCount(){return 2;}
+  function masterLinear(){return Math.pow(10,(+masterVolumeSlider.value)/20);}
+
+  playBtn.addEventListener('click',()=>{
+    const c=getAudioCtx();if(c.state==='suspended')c.resume();
+    if(isPlaying){pausePlayback();return;}
+    if(!lastSchedule.length)buildSchedule();
+    startOrResumePlayback(c);
+  });
+
+  function startOrResumePlayback(c){
+    const dur=+durationSlider.value;
+    if(!dur||!lastSchedule.length)return;
+    const startOffset=clamp(playPausedOffset,0,dur);
+    const start=c.currentTime+.08, chain=buildMasterChain(c,masterLinear());
+    const remaining=lastSchedule.filter(h=>h.time>=startOffset).map(h=>({...h,time:h.time-startOffset}));
+    playSources=scheduleHits(c,chain.entry,start,remaining,samples);
+    playCtxStartTime=start; isPlaying=true; playBtn.textContent='❚❚'; playBtn.classList.add('active');
+    stopVisualBtn.disabled=false;
+    updateBigTime(startOffset);
+    setStatus(startOffset>0?'Wznowiono odtwarzanie…':'Odtwarzanie zapisanego wariantu…');
+    clearTimeout(playEndTimer);
+    const remainingDur=Math.max(0,dur-startOffset);
+    playEndTimer=setTimeout(()=>{
+      if(isPlaying){isPlaying=false;playPausedOffset=0;playBtn.textContent='▶';playBtn.classList.remove('active');setStatus('Gotowe — ten sam wariant zostanie użyty przy eksporcie.');stopPlayheadAnim();setPlayheadPosition(0);updateBigTime(0);}
+    },(remainingDur+2.4)*1000);
+    startPlayheadAnim(dur);
+  }
+
+  function pausePlayback(){
+    const c=getAudioCtx(), elapsed=c.currentTime-playCtxStartTime;
+    playPausedOffset=clamp(playPausedOffset+elapsed,0,+durationSlider.value);
+    playSources.forEach(s=>{try{s.stop();}catch(e){}});playSources=[];
+    isPlaying=false;playBtn.textContent='▶';playBtn.classList.remove('active');
+    clearTimeout(playEndTimer);stopPlayheadAnim();
+    setPlayheadPosition(+durationSlider.value>0?playPausedOffset/+durationSlider.value:0);
+    updateBigTime(playPausedOffset);
+    setStatus('Wstrzymano — wciśnij odtwarzanie, aby kontynuować od tego miejsca.');
+  }
+
+  function hardResetPlayback(){
+    playSources.forEach(s=>{try{s.stop();}catch(e){}});playSources=[];
+    isPlaying=false;playPausedOffset=0;playBtn.textContent='▶';playBtn.classList.remove('active');
+    clearTimeout(playEndTimer);stopPlayheadAnim();setPlayheadPosition(0);updateBigTime(0);
+  }
+
+  function stopPlayback(){hardResetPlayback();setStatus('Zatrzymano — sekwencja wróciła do początku.');}
+  if(stopVisualBtn) stopVisualBtn.addEventListener('click',()=>{stopPlayback();});
+
+  rerollBtn.addEventListener('click',()=>{if(!samples.length)return;hardResetPlayback();reseed();buildSchedule();drawTimeline();setStatus('Wygenerowano nowy wariant. Odsłuch i eksport użyją dokładnie tego samego wariantu.');});
+
+  renderBtn.addEventListener('click',async()=>{
+    if(!samples.length)return;if(isPlaying)stopPlayback(); if(!lastSchedule.length)buildSchedule();
+    const format=fileFormat.value, isMp3=format==='mp3', channels=getChannelCount();
+    setStatus(isMp3?'Generowanie pliku MP3…':'Generowanie pliku WAV…');renderBtn.disabled=true;rerollBtn.disabled=true;
+    const dur=+durationSlider.value, rate=getRenderSampleRate(), spec=getOutputSpec();
+    const longest=Math.max(0,...lastSchedule.map(h=>samples[h.sampleIndex]?.buffer.duration||0));
+    const tail=0.35+Math.min(1.5,longest);
+    const offline=new OfflineAudioContext(channels,Math.ceil(rate*(dur+tail)),rate),chain=buildMasterChain(offline,masterLinear());
+    scheduleHits(offline,chain.entry,0,lastSchedule,samples);
+    const baseName=`chod-konia-${GAITS[currentGait].label.toLowerCase().replace(/[^a-ząćęłńóśźż]+/gi,'-')}-v09-motion`;
+    try{
+      const rendered=await offline.startRendering();
+      let blob,ext,readyMsg;
+      if(isMp3){
+        if(typeof lamejs==='undefined'){setStatus('Brak dostępu do biblioteki MP3 (sprawdź połączenie z internetem) — spróbuj wyeksportować WAV.');return;}
+        const kbps=+mp3Bitrate.value;
+        blob=bufferToMp3(rendered,kbps);ext='mp3';
+        readyMsg=`MP3 gotowy: ${rate/1000} kHz / ${kbps} kb/s stereo. Eksportowany został ten sam wariant co w podglądzie.`;
+      }else{
+        blob=bufferToWave(rendered,spec.bits);ext='wav';
+        readyMsg=`WAV gotowy: ${rate/1000===44.1?'44,1':rate/1000} kHz / ${spec.bits}-bit stereo. Eksportowany został ten sam wariant co w podglądzie.`;
+      }
+      const url=URL.createObjectURL(blob),a=document.createElement('a');a.href=url;a.download=`${baseName}.${ext}`;a.click();setTimeout(()=>URL.revokeObjectURL(url),1000);
+      setStatus(readyMsg);
+    }catch(err){console.error(err);setStatus('Coś poszło nie tak przy generowaniu pliku.');}
+    finally{renderBtn.disabled=false;rerollBtn.disabled=!samples.length;}
+  });
+
+  function bufferToWave(abuffer,bits=24){
+    const channels=abuffer.numberOfChannels, bytes=bits===24?3:2, length=44+abuffer.length*channels*bytes, buf=new ArrayBuffer(length),view=new DataView(buf),ch=[];let pos=0;
+    const wstr=s=>{for(let i=0;i<s.length;i++)view.setUint8(pos++,s.charCodeAt(i));},w16=v=>{view.setUint16(pos,v,true);pos+=2;},w32=v=>{view.setUint32(pos,v,true);pos+=4;};
+    wstr('RIFF');w32(length-8);wstr('WAVE');wstr('fmt ');w32(16);w16(1);w16(channels);w32(abuffer.sampleRate);w32(abuffer.sampleRate*channels*bytes);w16(channels*bytes);w16(bits);wstr('data');w32(length-pos-4);
+    for(let c=0;c<channels;c++)ch.push(abuffer.getChannelData(c));
+    for(let i=0;i<abuffer.length;i++)for(let c=0;c<channels;c++){
+      let v=clamp(ch[c][i],-0.999999,0.999999);
+      if(bits===24){let n=Math.round(v<0?v*0x800000:v*0x7fffff);view.setUint8(pos,n&255);view.setUint8(pos+1,(n>>8)&255);view.setUint8(pos+2,(n>>16)&255);pos+=3;}
+      else{let n=Math.round(v<0?v*0x8000:v*0x7fff);view.setInt16(pos,n,true);pos+=2;}
+    }
+    return new Blob([view],{type:'audio/wav'});
+  }
+
+  function floatTo16BitPCM(floatArr){
+    const out=new Int16Array(floatArr.length);
+    for(let i=0;i<floatArr.length;i++){const v=clamp(floatArr[i],-1,1);out[i]=v<0?v*0x8000:v*0x7fff;}
+    return out;
+  }
+
+  function bufferToMp3(abuffer,kbps=192){
+    const channels=abuffer.numberOfChannels, sampleRate=abuffer.sampleRate;
+    const encoder=new lamejs.Mp3Encoder(channels,sampleRate,kbps);
+    const blockSize=1152, mp3Data=[];
+    const left=floatTo16BitPCM(abuffer.getChannelData(0));
+    const right=channels>1?floatTo16BitPCM(abuffer.getChannelData(1)):null;
+    for(let i=0;i<left.length;i+=blockSize){
+      const leftChunk=left.subarray(i,i+blockSize);
+      let buf;
+      if(channels>1){const rightChunk=right.subarray(i,i+blockSize);buf=encoder.encodeBuffer(leftChunk,rightChunk);}
+      else{buf=encoder.encodeBuffer(leftChunk);}
+      if(buf.length>0)mp3Data.push(buf);
+    }
+    const end=encoder.flush(); if(end.length>0)mp3Data.push(end);
+    return new Blob(mp3Data,{type:'audio/mp3'});
+  }
+
+  updateVals();updateBigTime(0);updateButtons();renderSampleList();buildSchedule();drawTimeline();
+})();
+</script>
+</body>
+</html>
