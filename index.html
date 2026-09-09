@@ -1,0 +1,2279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Horse Movement - Hoofstep Generator v1.6</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<style>
+
+:root{
+  --bg:#080d0f;
+  --panel:rgba(14,19,22,.90);
+  --panel-2:#11171a;
+  --panel-3:#161d20;
+  --line:#30373b;
+  --line-soft:#242b2f;
+  --text:#f1f2f1;
+  --muted:#a8adb0;
+  --gold:#f0b85c;
+  --gold-hi:#ffc96f;
+  --rust:#c77b54;
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;min-height:100%;}
+body{
+  background:var(--bg);
+  color:var(--text);
+  font-family:"Segoe UI",Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,sans-serif;
+  line-height:1.35;
+  padding:0 0 38px;
+}
+/* Nieruchome tło strony. Kontener wysokości 100vh, przyklejony do dołu ekranu.
+   object-fit:cover + object-position:top dogląda, żeby zawsze widoczna była górna
+   część fotografii - kopyta konia w kurzu - tak jak na zdjęciu referencyjnym, a niżej
+   przechodzi w spokojną fakturę ziemi, przyciemnianą gradientem w miarę schodzenia w dół
+   strony. Element jest position:fixed, więc się nie przewija - rusza się tylko interfejs
+   nad nim. */
+.bg-fixed{
+  position:fixed;
+  left:0;right:0;bottom:0;
+  height:100vh;
+  overflow:hidden;
+  z-index:-3;
+  pointer-events:none;
+}
+.bg-fixed img{
+  display:block;
+  width:100%;height:100%;
+  object-fit:cover;
+  object-position:center top;
+}
+.bg-fixed:after{
+  content:"";
+  position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(8,13,15,.18) 0%,rgba(8,13,15,.28) 35%,rgba(9,14,16,.42) 65%,rgba(9,14,16,.55) 100%);
+}
+.wrap{max-width:1286px;margin:0 auto;padding:0 0 30px;}
+.hero{
+  position:relative;
+  min-height:250px;
+  padding:48px 12px 30px;
+  overflow:hidden;
+  display:flex;align-items:center;
+}
+.hero-copy{max-width:920px;position:relative;z-index:2}
+.language-switch{
+  position:absolute;top:28px;right:12px;z-index:5;display:flex;align-items:center;
+  padding:3px;border:1px solid rgba(240,184,92,.38);border-radius:22px;
+  background:rgba(8,13,15,.72);backdrop-filter:blur(8px);box-shadow:0 8px 22px rgba(0,0,0,.22)
+}
+.language-btn{
+  min-width:42px;height:28px;padding:0 11px;border:0;border-radius:17px;background:transparent;
+  color:#9ea4a6;font:700 11px/1 inherit;letter-spacing:.7px;cursor:pointer;transition:.18s ease
+}
+.language-btn:hover{color:#f3f4f3}
+.language-btn.active{background:var(--gold);color:#201608;box-shadow:0 3px 10px rgba(240,184,92,.22)}
+@media(max-width:640px){.language-switch{top:16px;right:12px}.hero{padding-top:62px}}
+.hero-brand{
+  margin:0 0 9px;
+  color:var(--gold);
+  font-size:10px;
+  font-weight:800;
+  letter-spacing:2.8px;
+  text-transform:uppercase;
+  opacity:.9;
+}
+h1{
+  margin:0 0 2px;
+  font-size:46px;
+  line-height:1.04;
+  letter-spacing:.4px;
+  font-weight:800;
+  text-transform:uppercase;
+  color:#f5f5f3;
+}
+.hero-slash{
+  color:var(--gold);
+  font-weight:400;
+  margin:0 5px;
+}
+.hero-en{
+  color:#bfc3c2;
+  font-weight:600;
+  letter-spacing:1px;
+}
+h1 span{display:none!important}
+.subtitle{
+  margin:7px 0 10px;
+  color:var(--gold);
+  font-size:22px;
+  line-height:1.2;
+  letter-spacing:.1px;
+}
+.hero-desc{
+  margin:0;color:#d4d6d5;font-size:15px;max-width:700px;
+}
+.development-note{
+  display:inline-flex;align-items:center;gap:8px;max-width:760px;margin:15px 0 0;
+  padding:8px 12px;border:1px solid rgba(240,184,92,.28);border-radius:8px;
+  background:rgba(8,13,15,.48);color:#bfc4c4;font-size:12.5px;line-height:1.45
+}
+.development-note:before{content:"●";flex:0 0 auto;color:var(--gold);font-size:8px}
+.development-note a{color:var(--gold-hi);font-weight:800;text-decoration:none;letter-spacing:.3px;white-space:nowrap}
+.development-note a:hover{text-decoration:underline;color:#ffd88e}
+@media(max-width:640px){.development-note{display:flex;align-items:flex-start;font-size:12px}}
+.dashboard{display:grid;grid-template-columns:515px 1fr;gap:10px;}
+.section{
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:linear-gradient(145deg,rgba(17,23,26,.95),rgba(12,17,20,.91));
+  box-shadow:0 14px 30px rgba(0,0,0,.18),inset 0 1px rgba(255,255,255,.025);
+  padding:18px 20px;
+  margin:0;
+}
+.section h2{
+  font-family:inherit;font-size:15px;font-weight:700;
+  color:#f0f1f0;margin:0 0 15px;text-transform:uppercase;
+  letter-spacing:.15px;
+}
+.section-head{display:flex;align-items:center;justify-content:space-between;gap:10px;margin:0 0 15px}
+.section-head h2{margin:0}
+.reset-tile-btn{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;
+  height:26px;padding:0 10px;border:1px solid var(--line-soft);border-radius:20px;
+  background:rgba(255,255,255,.02);color:#9aa0a2;font-family:inherit;font-size:11px;font-weight:600;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;white-space:nowrap;
+}
+.reset-tile-btn:before{content:"↺";font-size:13px;line-height:1}
+.reset-tile-btn:hover{border-color:var(--gold);color:var(--gold-hi);background:rgba(240,184,92,.06)}
+.reset-tile-btn:active{transform:scale(.96)}
+.section p.hint{color:var(--muted);font-size:12px;margin:-8px 0 14px}
+.samples-panel{min-height:430px}
+.drop{
+  height:96px;border:1px dashed #3d4549;border-radius:9px;
+  padding:0;display:flex;align-items:center;justify-content:center;
+  text-align:center;cursor:pointer;color:#b7bdc0;
+  background:rgba(7,11,13,.36);transition:.15s ease;
+}
+.drop:hover,.drop.drag{border-color:var(--gold);background:rgba(240,184,92,.05);color:#eee}
+.drop strong{display:block;color:#f2f3f2;font-size:14px;font-weight:500;margin-bottom:4px}
+.drop div{font-size:13px;color:#b7bdc0}
+.drop .formats{display:block;font-size:12px;color:#80878a;margin-top:3px}
+input[type=file]{display:none}
+.sample-list{list-style:none;margin:13px 0 0;padding:0;display:flex;flex-direction:column;gap:0;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.sample-list li{
+  min-height:41px;display:flex;align-items:center;justify-content:space-between;
+  background:#111619;border:0;border-bottom:1px solid var(--line-soft);
+  border-radius:0;padding:0 11px;font-size:13px;color:#d5d7d7;
+}
+.sample-list li:last-child{border-bottom:0}
+.clear-all-btn{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:5px;
+  height:26px;padding:0 10px;border:1px solid var(--line-soft);border-radius:20px;
+  background:rgba(255,255,255,.02);color:#9aa0a2;font-family:inherit;font-size:11px;font-weight:600;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;white-space:nowrap;
+}
+.clear-all-btn:before{content:"🗑";font-size:12px;line-height:1}
+.clear-all-btn:hover{border-color:#e8785c;color:#e8785c;background:rgba(240,120,92,.08)}
+.clear-all-btn:active{transform:scale(.96)}
+.clear-all-btn:disabled{opacity:.35;cursor:default;pointer-events:none}
+.samples-toggle{
+  width:100%;margin-top:9px;height:34px;
+  border:1px solid var(--line);border-radius:8px;
+  background:#111619;color:#b7bdc0;font-family:inherit;font-size:12px;font-weight:600;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;
+}
+.samples-toggle:hover{border-color:var(--gold);color:var(--gold-hi);background:rgba(240,184,92,.05)}
+.demo-samples-btn{
+  width:100%;margin-top:9px;height:34px;
+  border:1px dashed #4a4239;border-radius:8px;
+  background:rgba(240,184,92,.04);color:#c9a06a;font-family:inherit;font-size:12px;font-weight:600;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;
+  display:inline-flex;align-items:center;justify-content:center;gap:7px;
+}
+.demo-samples-btn:hover{border-color:var(--gold);color:var(--gold-hi);background:rgba(240,184,92,.09)}
+.demo-samples-btn:active{transform:scale(.98)}
+.demo-samples-btn:disabled{opacity:.45;cursor:default;pointer-events:none}
+.sample-play-btn{
+  flex:0 0 auto;width:22px;height:22px;margin-right:11px;padding:0;border:0;
+  background:transparent;cursor:pointer;
+  display:flex;align-items:center;justify-content:center;border-radius:50%;transition:.15s ease;
+}
+.sample-play-btn:hover{background:rgba(96,214,140,.12)}
+.sample-play-btn .icon{
+  width:0;height:0;margin-left:2px;
+  border-style:solid;border-width:5.5px 0 5.5px 9px;
+  border-color:transparent transparent transparent #b8babb;
+  transition:.15s ease;
+}
+.sample-play-btn:hover .icon{border-left-color:#60d68c}
+.sample-play-btn.playing{background:rgba(96,214,140,.14)}
+.sample-play-btn.playing .icon{
+  width:3px;height:9px;margin-left:0;
+  border-style:none;border-radius:1px;
+  background:#60d68c;box-shadow:5px 0 0 #60d68c;
+}
+.sample-play-btn.playing:hover .icon{background:#7be09f;box-shadow:5px 0 0 #7be09f}
+.sample-list li>span{flex:1;display:flex;align-items:center;min-width:0}
+.sample-list button:not(.sample-play-btn){
+  width:27px;height:27px;padding:0;border:0;background:transparent;color:#aeb2b4;
+  font-size:0;cursor:pointer;position:relative;border-radius:6px;transition:.15s ease
+}
+.sample-list button:not(.sample-play-btn):hover{background:rgba(240,120,92,.10)}
+.sample-list button:not(.sample-play-btn):after{content:"🗑";font-size:14px;color:#a8abad;}
+.sample-list button:not(.sample-play-btn):hover:after{color:#e8785c}
+.modal-overlay{
+  position:fixed;inset:0;z-index:1000;
+  background:rgba(4,7,8,.72);
+  display:flex;align-items:center;justify-content:center;
+  padding:20px;
+  animation:modalFade .15s ease;
+}
+@keyframes modalFade{from{opacity:0}to{opacity:1}}
+.modal-box{
+  width:100%;max-width:480px;
+  background:linear-gradient(145deg,rgba(20,26,29,.98),rgba(13,18,21,.98));
+  border:1px solid var(--line);border-radius:14px;
+  box-shadow:0 24px 60px rgba(0,0,0,.5);
+  padding:24px 24px 20px;
+}
+.modal-box h3{margin:0 0 6px;font-size:18px;color:#f5f5f3;letter-spacing:.2px}
+.modal-box p.hint{color:var(--muted);font-size:13px;margin:0 0 18px}
+.upload-mode-options{display:flex;flex-direction:column;gap:10px}
+.upload-mode-option{
+  display:block;width:100%;text-align:left;
+  border:1px solid var(--line);border-radius:10px;
+  background:#111619;color:var(--text);
+  padding:13px 14px;cursor:pointer;font-family:inherit;
+  transition:.15s ease;
+}
+.upload-mode-option:hover{border-color:var(--gold);background:rgba(240,184,92,.06)}
+.upload-mode-option:active{transform:scale(.99)}
+.upload-mode-option strong{display:block;font-size:14px;color:var(--gold-hi);margin-bottom:4px}
+.upload-mode-option span{display:block;font-size:12.5px;color:var(--muted);line-height:1.4}
+.modal-actions{display:flex;justify-content:flex-end;margin-top:16px}
+.modal-cancel-btn{
+  border:1px solid var(--line-soft);border-radius:20px;background:transparent;
+  color:#9aa0a2;font-family:inherit;font-size:12px;font-weight:600;letter-spacing:.2px;
+  padding:7px 14px;cursor:pointer;transition:.15s ease;
+}
+.modal-cancel-btn:hover{border-color:#e8785c;color:#e8785c}
+/* Przycisk otwierający okno zapisu/wczytywania własnych presetów w kafelku
+   "Charakter konia" - celowo mocniej zaakcentowany (złote obramowanie/tło)
+   niż neutralne .reset-tile-btn, bo to akcja, którą chcemy, żeby użytkownik
+   zauważył, a nie tylko odnajdywał przy okazji. */
+.preset-io-btn{
+  flex:0 0 auto;display:inline-flex;align-items:center;gap:7px;
+  height:32px;padding:0 15px;border:1px solid rgba(240,184,92,.45);border-radius:20px;
+  background:linear-gradient(145deg,rgba(240,184,92,.16),rgba(240,184,92,.05));
+  color:var(--gold-hi);font-family:inherit;font-size:12px;font-weight:700;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;white-space:nowrap;
+}
+.preset-io-btn:before{content:"💾";font-size:13px;line-height:1}
+.preset-io-btn:hover{border-color:var(--gold);background:linear-gradient(145deg,rgba(240,184,92,.26),rgba(240,184,92,.09));box-shadow:0 6px 16px rgba(240,184,92,.14)}
+.preset-io-btn:active{transform:scale(.96)}
+@media(max-width:640px){.preset-io-btn{width:100%;justify-content:center}}
+/* Okno (modal) zapisu/wczytywania własnych presetów. */
+.preset-io-box{max-width:520px}
+.preset-io-save-row{display:flex;gap:10px;align-items:flex-end;margin-bottom:20px}
+.preset-io-save-row .field{flex:1 1 auto;margin-bottom:0}
+.preset-io-save-row .field label{
+  display:block;font-size:11px;color:var(--muted);text-transform:uppercase;
+  letter-spacing:.6px;margin-bottom:6px
+}
+.preset-io-input{
+  width:100%;height:36px;background:#111619;color:#eceeee;border:1px solid #343c40;
+  border-radius:7px;padding:0 12px;font-family:inherit;font-size:13px;
+}
+.preset-io-input:focus{outline:none;border-color:var(--gold)}
+.preset-io-save-btn{
+  flex:0 0 auto;height:36px;padding:0 16px;border:1px solid var(--gold);border-radius:8px;
+  background:linear-gradient(145deg,rgba(240,184,92,.9),rgba(216,159,74,.95));
+  color:#1c1305;font-family:inherit;font-size:12.5px;font-weight:700;letter-spacing:.2px;
+  cursor:pointer;transition:.15s ease;white-space:nowrap;
+}
+.preset-io-save-btn:hover{filter:brightness(1.08)}
+.preset-io-save-btn:active{transform:scale(.97)}
+.preset-io-save-btn:disabled{opacity:.4;cursor:default;pointer-events:none;filter:none}
+.preset-io-divider{
+  display:flex;align-items:center;gap:10px;margin:0 0 12px;
+  font-size:11px;font-weight:700;letter-spacing:.6px;color:var(--muted);text-transform:uppercase;
+}
+.preset-io-divider:before,.preset-io-divider:after{content:"";flex:1 1 auto;height:1px;background:var(--line-soft)}
+.preset-io-list{
+  list-style:none;margin:0;padding:0;max-height:264px;overflow-y:auto;
+  display:flex;flex-direction:column;gap:8px;
+}
+.preset-io-item{
+  display:flex;align-items:center;justify-content:space-between;gap:10px;
+  background:#111619;border:1px solid var(--line-soft);border-radius:9px;padding:10px 12px;
+  transition:.15s ease;
+}
+.preset-io-item:hover{border-color:#3a4247}
+.preset-io-item-info{min-width:0}
+.preset-io-item-name{font-size:13.5px;color:#f0f1f0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preset-io-item-meta{font-size:11.5px;color:var(--muted);margin-top:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preset-io-item-actions{flex:0 0 auto;display:flex;align-items:center;gap:6px}
+.preset-io-load-btn{
+  height:28px;padding:0 12px;border:1px solid rgba(240,184,92,.4);border-radius:16px;
+  background:rgba(240,184,92,.08);color:var(--gold-hi);font-family:inherit;font-size:11.5px;font-weight:700;
+  letter-spacing:.2px;cursor:pointer;transition:.15s ease;white-space:nowrap;
+}
+.preset-io-load-btn:hover{border-color:var(--gold);background:rgba(240,184,92,.16)}
+.preset-io-load-btn:active{transform:scale(.96)}
+.preset-io-delete-btn{
+  flex:0 0 auto;width:28px;height:28px;padding:0;border:0;background:transparent;color:#aeb2b4;
+  font-size:0;cursor:pointer;position:relative;border-radius:6px;transition:.15s ease;
+}
+.preset-io-delete-btn:after{content:"🗑";font-size:13px;color:#a8abad}
+.preset-io-delete-btn:hover{background:rgba(240,120,92,.10)}
+.preset-io-delete-btn:hover:after{color:#e8785c}
+.preset-io-empty{color:var(--muted);font-size:13px;margin:4px 0 0;padding:14px 0;text-align:center}
+.gaits{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:17px}
+.gait-btn{
+  height:133px;background:linear-gradient(180deg,#151b1e,#111619);
+  border:1px solid #2a3236;color:#a8adaf;border-radius:11px;
+  padding:14px 8px 10px;text-align:center;cursor:pointer;font-size:14px;
+  display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+  transition:.15s ease;position:relative;
+}
+.gait-btn:before{
+  content:"";position:absolute;top:14px;left:0;right:0;height:56px;
+  background-repeat:no-repeat;background-position:center;background-size:contain;
+  transition:.15s ease;
+}
+.gait-btn[data-gait="walk"]:before{background-image:url('horses/horse-walk-grey.png')}
+.gait-btn[data-gait="trot"]:before{background-image:url('horses/horse-trot-grey.png')}
+.gait-btn[data-gait="canter"]:before{background-image:url('horses/horse-canter-grey.png')}
+.gait-btn[data-gait="gallop"]:before{background-image:url('horses/horse-gallop-grey.png')}
+.gait-btn.active{
+  border-color:var(--gold);background:linear-gradient(180deg,#3a2c1c,#2b2116);
+  color:var(--gold-hi);box-shadow:inset 0 0 28px rgba(240,184,92,.07);
+}
+.gait-btn.active[data-gait="walk"]:before{background-image:url('horses/horse-walk-gold.png')}
+.gait-btn.active[data-gait="trot"]:before{background-image:url('horses/horse-trot-gold.png')}
+.gait-btn.active[data-gait="canter"]:before{background-image:url('horses/horse-canter-gold.png')}
+.gait-btn.active[data-gait="gallop"]:before{background-image:url('horses/horse-gallop-gold.png')}
+.gait-btn:hover{color:#e9eaeb}
+.gait-btn .beat-count{display:block;font-size:12px;color:#8d9396;margin-top:4px}
+.gait-btn.active .beat-count{color:#b5a487}
+.field{margin-bottom:17px}
+.field label{
+  display:flex;justify-content:space-between;gap:14px;
+  font-size:13px;color:#e0e2e2;margin-bottom:8px
+}
+.field label span.val{color:var(--gold);font-variant-numeric:tabular-nums}
+.label-text{display:inline-flex;align-items:center;gap:6px}
+.info-tip{position:relative;display:inline-flex;align-items:center;justify-content:center}
+.info-tip .info-icon{
+  width:14px;height:14px;border-radius:50%;
+  border:1px solid #565d61;color:#9aa0a2;
+  font-size:10px;line-height:12px;font-weight:700;font-style:normal;
+  display:flex;align-items:center;justify-content:center;
+  cursor:help;user-select:none;transition:.15s ease;
+}
+.info-tip:hover .info-icon,.info-tip:focus-within .info-icon{border-color:var(--gold);color:var(--gold-hi)}
+.info-tip .tip-bubble{
+  position:absolute;left:50%;bottom:calc(100% + 8px);transform:translateX(-50%) translateY(4px);
+  width:230px;padding:9px 11px;border-radius:8px;
+  background:#1a2124;border:1px solid var(--line);
+  color:#d5d7d7;font-size:12px;font-weight:400;line-height:1.4;
+  text-transform:none;letter-spacing:normal;
+  box-shadow:0 10px 24px rgba(0,0,0,.35);
+  opacity:0;visibility:hidden;pointer-events:none;
+  transition:opacity .15s ease,transform .15s ease;
+  z-index:20;
+}
+.info-tip .tip-bubble:after{
+  content:"";position:absolute;top:100%;left:50%;transform:translateX(-50%);
+  border:6px solid transparent;border-top-color:#1a2124;
+}
+.info-tip:hover .tip-bubble,.info-tip:focus-within .tip-bubble{
+  opacity:1;visibility:visible;transform:translateX(-50%) translateY(0);
+}
+.loop-toggle-text strong{display:flex;align-items:center;gap:6px}
+.loop-tip .tip-bubble{
+  left:0;bottom:auto;top:calc(100% + 8px);
+  transform:translateY(-4px);width:260px;
+}
+.loop-tip .tip-bubble:after{
+  top:auto;bottom:100%;left:14px;transform:none;
+  border-color:transparent transparent #1a2124 transparent;
+}
+.loop-tip:hover .tip-bubble,.loop-tip:focus-within .tip-bubble{
+  transform:translateY(0);
+}
+input[type=range]{
+  width:100%;height:4px;accent-color:var(--gold);
+  appearance:auto;cursor:pointer
+}
+input[type=range]:disabled{opacity:.4}
+.controls-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 28px}
+select{
+  width:100%;height:36px;background:#111619;color:#eceeee;border:1px solid #343c40;
+  border-radius:7px;padding:0 11px;font-family:inherit;font-size:13px
+}
+.output-panel{grid-column:1 / -1;margin-top:0;padding-top:14px}
+.output-panel .playbar{margin-top:0}
+.preset-section{grid-column:1 / -1}
+.preset-body{display:flex;align-items:center;gap:20px;flex-wrap:wrap;margin-top:2px}
+.preset-icon{
+  flex:0 0 auto;width:52px;height:52px;border-radius:14px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:26px;background:linear-gradient(145deg,rgba(240,184,92,.14),rgba(240,184,92,.04));
+  border:1px solid rgba(240,184,92,.35);transition:.2s ease;
+}
+.preset-select-wrap{flex:0 0 auto;min-width:230px;max-width:280px}
+.preset-select-wrap label{display:block;font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.6px;margin-bottom:6px}
+.preset-desc{
+  flex:1 1 280px;margin:0;color:var(--muted);font-size:13px;line-height:1.5;
+  padding-left:18px;border-left:1px solid var(--line-soft);
+}
+@media(max-width:640px){.preset-desc{padding-left:0;border-left:0;margin-top:2px}}
+.saddle-section{grid-column:1 / -1}
+.saddle-controls{display:block}
+.saddle-toggle{display:flex;align-items:center;gap:12px;cursor:pointer;user-select:none}
+.saddle-toggle input{position:absolute;opacity:0;width:0;height:0}
+.saddle-toggle-box{flex:0 0 auto;width:42px;height:23px;border-radius:14px;border:1px solid #454d50;background:#171d20;position:relative;transition:.18s ease}
+.saddle-toggle-box:after{content:"";position:absolute;left:3px;top:3px;width:15px;height:15px;border-radius:50%;background:#868d90;transition:.18s ease}
+.saddle-toggle input:checked+.saddle-toggle-box{border-color:var(--gold);background:rgba(240,184,92,.14)}
+.saddle-toggle input:checked+.saddle-toggle-box:after{left:22px;background:var(--gold-hi);box-shadow:0 0 10px rgba(240,184,92,.35)}
+.saddle-toggle input:focus-visible+.saddle-toggle-box{box-shadow:0 0 0 3px rgba(240,184,92,.22)}
+.saddle-toggle-copy strong{display:block;color:#eceeed;font-size:13px;margin-bottom:2px}
+.saddle-toggle-copy small{display:block;color:var(--muted);font-size:11.5px;line-height:1.4}
+.saddle-state{display:inline-flex;align-items:center;gap:6px;margin-top:9px;color:#899093;font-size:11px}
+.saddle-state:before{content:"●";font-size:7px;color:#697174}
+.saddle-state.ready{color:#9dcbaa}.saddle-state.ready:before{color:#60d68c}
+.saddle-state.error{color:#e09a87}.saddle-state.error:before{color:#e8785c}
+.saddle-volume-wrap.disabled{opacity:.42;pointer-events:none}
+.advanced{margin-top:0;grid-column:1 / -1;width:100%;}
+.advanced>summary{
+  list-style:none;cursor:pointer;
+  display:flex;align-items:center;min-height:44px;padding:0 16px;
+  border:1px solid var(--line);border-radius:9px;
+  background:linear-gradient(180deg,#151b1d,#101517);
+  color:#f0f1f0;font-family:inherit;font-size:15px;font-weight:700;
+  text-transform:uppercase;letter-spacing:.15px;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.025);
+  transition:border-color .15s ease,color .15s ease;
+}
+.advanced>summary::-webkit-details-marker{display:none}
+.advanced>summary:hover{border-color:#454d50;color:#f7f8f7}
+.advanced>summary:before{content:"⚙";color:var(--gold);font-size:15px;margin-right:10px}
+.advanced>summary:after{content:"▸";margin-left:auto;color:var(--gold);font-size:13px;display:inline-block;transition:transform .32s cubic-bezier(.4,0,.2,1)}
+.advanced[open]>summary{border-radius:9px 9px 0 0;border-bottom-color:transparent}
+.advanced.is-anim-open>summary:after{transform:rotate(90deg)}
+.advanced .advanced-body{
+  padding:12px;
+  border:1px solid #252d30;border-top:0;border-radius:0 0 9px 9px;
+  background:#0d1214;
+  display:grid;gap:10px;
+}
+.advanced .section{
+  margin:0;padding:14px 16px;
+  border:1px solid var(--line-soft);border-radius:9px;
+  background:linear-gradient(145deg,rgba(20,26,29,.9),rgba(14,19,22,.88));
+  box-shadow:inset 0 1px rgba(255,255,255,.02);
+}
+.advanced .section h2{margin-bottom:11px;color:#d2d5d5;font-size:12px;letter-spacing:.45px}
+.player-settings{display:grid;grid-template-columns:1fr 1fr 1fr 1fr;gap:24px;align-items:end;margin-bottom:16px;padding-bottom:16px;border-bottom:1px solid var(--line-soft)}
+.player-settings .field{margin-bottom:0}
+.playbar{
+  margin-top:13px;border:1px solid var(--line);border-radius:11px;
+  background:linear-gradient(180deg,#111719,#0e1416);
+  padding:16px 18px 18px;
+}
+.playbar-controls{display:flex;align-items:center;gap:14px;margin-bottom:14px}
+.circle-btn{width:46px;height:46px;border-radius:50%;border:1px solid #454d50;background:#171d20;color:#dfe1e1;font-size:20px;display:flex;align-items:center;justify-content:center;cursor:pointer;transition:box-shadow .2s ease,border-color .2s ease;flex:0 0 auto}
+.circle-btn.play{border-color:var(--gold);color:var(--gold);font-size:20px;box-shadow:0 0 18px rgba(240,184,92,.08)}
+.circle-btn.play.active{box-shadow:0 0 24px rgba(240,184,92,.32);border-color:var(--gold-hi)}
+.time-block{flex:0 0 auto}
+.time-block b{font-size:18px;color:#f1f2f2;font-weight:500} .time-block small{display:block;color:#8f9699;font-size:10px;text-transform:uppercase;letter-spacing:.6px}
+.preview-wrap{
+  height:100px;position:relative;border-radius:9px;overflow:hidden;
+  background:linear-gradient(180deg,#151b1e,#0d1214);
+  border:1px solid #262d30;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.03),inset 0 0 22px rgba(0,0,0,.4);
+}
+.preview-canvas{display:block;width:100%;height:100%}
+.preview-wrap .playhead{
+  position:absolute;top:0;bottom:0;left:0;width:2px;
+  background:linear-gradient(180deg,var(--gold-hi),var(--gold));
+  box-shadow:0 0 10px rgba(240,184,92,.75),0 0 2px rgba(255,255,255,.6);
+  pointer-events:none;opacity:0;transition:opacity .15s ease;transform:translateX(-1px);
+}
+.preview-wrap .playhead.active{opacity:1}
+.timeline-legend{display:flex;flex-wrap:wrap;gap:14px;justify-content:flex-end;margin-top:7px;font-size:11px;color:var(--muted)}
+.timeline-legend span{display:inline-flex;align-items:center;gap:5px}
+.timeline-legend i{width:8px;height:8px;border-radius:50%;display:inline-block;flex:0 0 auto}
+.export{height:46px;border:1px solid #454c4f;background:#111719;border-radius:7px;color:#f0f1f1;font-weight:600;font-size:14px;cursor:pointer}
+.export:hover{border-color:var(--gold);color:var(--gold-hi)}
+.actions{display:none}
+.status{font-size:12px;color:#7f878a;margin-top:8px;min-height:1.2em}
+footer{display:none}
+@media(max-width:1050px){
+  .wrap{padding:0 16px}.dashboard{grid-template-columns:1fr}
+  .hero{padding-left:0}
+  .player-settings{grid-template-columns:1fr 1fr}
+}
+@media(max-width:720px){
+  h1{font-size:32px}.hero-brand{font-size:9px;letter-spacing:2.2px}.hero-slash{margin:0 2px}.hero-en{letter-spacing:.5px}.subtitle{font-size:18px}.hero{min-height:205px}
+  .gaits{grid-template-columns:repeat(2,1fr)}.controls-grid{grid-template-columns:1fr}
+  .playbar{padding:12px 12px 14px}.playbar-controls{gap:9px;flex-wrap:wrap}
+  .playbar-controls .time-block:nth-of-type(2){display:none}
+  .preview-wrap{height:150px}
+  .player-settings{grid-template-columns:1fr}
+}
+
+
+/* === WORKFLOW REDESIGN === */
+.workflow-kicker{font-size:10px;font-weight:800;letter-spacing:1.8px;color:var(--gold);margin-bottom:3px;opacity:.9}
+.section>h2,.section-head h2{letter-spacing:.9px}
+.samples-panel,.dashboard>.section:not(.output-panel),.advanced,.output-panel{position:relative;overflow:hidden}
+.samples-panel:before,.dashboard>.section:not(.output-panel):before,.advanced:before,.output-panel:before{content:"";position:absolute;left:0;top:0;bottom:0;width:2px;background:linear-gradient(180deg,var(--gold),rgba(240,184,92,.08));opacity:.7}
+.advanced{padding:0;border-radius:10px}
+.advanced>summary{min-height:66px;padding:0 18px;gap:13px}
+.advanced>summary:before{display:none}
+.advanced>summary:after{margin-left:auto}
+.advanced>summary .summary-step{display:grid;place-items:center;width:28px;height:28px;border:1px solid rgba(240,184,92,.4);border-radius:50%;color:var(--gold);font-size:10px;letter-spacing:1px;flex:0 0 auto}
+.advanced>summary span:nth-child(2){display:flex;flex-direction:column;gap:2px}
+.advanced>summary small{font-size:11px;font-weight:500;color:var(--muted);text-transform:none;letter-spacing:0}
+.advanced-body{padding:10px!important}
+.advanced-body>.section{background:linear-gradient(145deg,rgba(23,29,32,.92),rgba(12,17,19,.92));border-color:#30383b}
+.advanced-body>.section h2{font-size:11px;letter-spacing:.8px}
+.combined-panel{padding-bottom:17px;background:linear-gradient(145deg,rgba(18,24,27,.96),rgba(11,16,18,.96))}
+.combined-panel .playbar{margin-top:4px}
+.combined-grid{display:grid;grid-template-columns:1.3fr 1fr;gap:28px}
+.export-col{border-left:1px solid var(--line-soft);padding-left:28px}
+.preview-sliders{display:grid;grid-template-columns:1fr 1fr;gap:24px;margin:14px 0}
+.export-col .player-settings{grid-template-columns:1fr;gap:14px;margin-bottom:16px}
+.loop-toggle-row{margin:14px 0 0;padding-top:14px;border-top:1px solid var(--line-soft)}
+.loop-toggle{display:flex;align-items:flex-start;gap:11px;cursor:pointer;user-select:none}
+.loop-toggle input{position:absolute;opacity:0;width:0;height:0}
+.loop-toggle-box{flex:0 0 auto;width:20px;height:20px;margin-top:1px;border-radius:6px;border:1px solid #454d50;background:#171d20;position:relative;transition:border-color .15s ease,background .15s ease}
+.loop-toggle-box:after{content:"";position:absolute;left:6px;top:2px;width:5px;height:9px;border:solid var(--gold-hi);border-width:0 2px 2px 0;transform:rotate(45deg);opacity:0;transition:opacity .1s ease}
+.loop-toggle input:checked+.loop-toggle-box{border-color:var(--gold);background:rgba(240,184,92,.12)}
+.loop-toggle input:checked+.loop-toggle-box:after{opacity:1}
+.loop-toggle input:focus-visible+.loop-toggle-box{box-shadow:0 0 0 3px rgba(240,184,92,.25)}
+.loop-toggle-text strong{display:block;font-size:13px;color:#e9eaea;font-weight:600;margin-bottom:2px}
+.loop-toggle-text small{display:block;font-size:11.5px;color:var(--muted);line-height:1.45}
+.loop-warning{margin:9px 0 0 31px;font-size:11.5px;color:#e0b060;background:rgba(224,176,96,.08);border:1px solid rgba(224,176,96,.28);border-radius:7px;padding:8px 10px;line-height:1.4}
+.dur-actual{margin-left:6px;color:var(--muted);font-weight:400;font-size:11px}
+@media(max-width:980px){.combined-grid{grid-template-columns:1fr}.export-col{border-left:none;padding-left:0;border-top:1px solid var(--line-soft);padding-top:18px;margin-top:4px}}
+@media(max-width:600px){.preview-sliders{grid-template-columns:1fr}}
+
+.export-action-row{display:flex;align-items:center;justify-content:space-between;gap:20px;border-top:1px solid var(--line-soft);padding-top:14px}
+.export-note{display:flex;flex-direction:column;gap:3px;color:#d7dad9;font-size:12px}
+.export-note span{color:var(--muted);font-size:11px}
+.export-action-row .export{min-width:180px}
+@media(max-width:850px){.export-action-row{align-items:stretch;flex-direction:column}.export-action-row .export{width:100%}}
+/* v1.6 additions retain the established dark and gold interface. */
+.field label,.tool-check,.hint,.loop-toggle-text small,.readout,.meter{font-size:13px;line-height:1.55}
+.field label{gap:8px;align-items:baseline;flex-wrap:wrap}
+.field .val{margin-left:auto;white-space:nowrap}
+.field select,.number-input{width:100%;min-width:0;height:auto;min-height:42px;line-height:1.35;border:1px solid var(--line);border-radius:8px;background:var(--panel-2);color:var(--text);padding:10px 12px;font:inherit;font-size:14px}
+select option{background:#11171a;color:#f1f2f1}
+.controls-grid>*{min-width:0}
+.tool-button{background:#20292d;border:1px solid #475358;color:var(--text);padding:9px 12px;border-radius:7px;cursor:pointer;font:inherit;font-size:13px;line-height:1.35}
+.tool-button:hover{border-color:var(--gold);color:var(--gold-hi)}
+button:disabled,input:disabled,select:disabled{opacity:.45;cursor:not-allowed}
+button:focus-visible,input:focus-visible,select:focus-visible,summary:focus-visible,[role=button]:focus-visible,canvas:focus-visible{outline:2px solid var(--gold-hi);outline-offset:4px}
+.tool-check{display:flex;align-items:center;gap:9px;cursor:pointer;margin:10px 0;color:var(--text);text-transform:none;letter-spacing:normal}
+.tool-check input{appearance:auto!important;position:static!important;opacity:1!important;width:17px!important;height:17px!important;margin:0;accent-color:var(--gold);flex:0 0 17px}
+.asset-input{display:block!important;width:100%;color:var(--muted);font-size:13px;margin:7px 0 14px}
+.asset-input::file-selector-button{background:#263137;color:var(--text);border:1px solid #49565b;padding:8px;border-radius:6px;margin-right:8px}
+.layer-details{border-top:1px solid var(--line);margin-top:16px;padding-top:12px}
+.layer-details summary{color:var(--gold);cursor:pointer;font-size:14px;margin-bottom:12px}
+.layer-details>.tool-button{margin:4px 4px 4px 0}
+.readout,.meter{overflow-wrap:anywhere;padding:11px 13px;background:#10191e;border:1px solid #2b3b43;border-radius:7px;color:#becdd1;margin:12px 0}
+.layer-mixer{border-block:1px solid var(--line-soft);padding:6px 0;margin-top:15px}
+.layer-mix-row{display:grid;grid-template-columns:minmax(80px,1fr) auto auto;align-items:center;gap:20px;font-size:13px}
+.layer-mix-row .tool-check{margin:5px 0}
+.project-row{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+.project-row+.hint{margin:12px 0 0}
+.sample-review-row{display:flex;gap:12px;justify-content:space-between;align-items:center;border-bottom:1px solid var(--line-soft);padding:11px 0;list-style:none}
+.sample-info{min-width:0;font-size:13px;overflow-wrap:anywhere}
+.sample-info small{display:block;color:var(--muted);font-size:12px;margin-top:4px}
+.sample-actions{display:flex;gap:6px;flex-shrink:0}
+.sample-actions button{padding:7px;font-size:12px}
+.sample-list .sample-actions .tool-button{width:auto;height:auto;min-width:30px;display:inline-flex;align-items:center;justify-content:center;padding:8px;font-size:12px;color:var(--text);background:#20292d;border:1px solid #475358}
+.sample-list .sample-actions .tool-button:after{content:none}
+.bank-warning:empty{display:none}
+.bank-warning{font-size:13px;color:var(--gold);line-height:1.6}
+.sample-editor{width:min(960px,calc(100vw - 24px));max-height:90vh;overflow:auto;border:1px solid #54636a;border-radius:14px;background:#121b20;color:var(--text);padding:24px}
+.sample-editor::backdrop{background:rgba(0,0,0,.78)}
+.sample-editor h3{margin:0 0 16px;overflow-wrap:anywhere;font-size:18px}
+.sample-editor canvas{display:block;width:100%;height:190px;border:1px solid #35434a;border-radius:8px;cursor:crosshair;margin-bottom:16px}
+.editor-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px}
+.editor-grid .field{margin:0}
+.editor-grid label{display:block;margin-bottom:6px;text-transform:none}
+.editor-actions{display:flex;flex-wrap:wrap;gap:8px;border-top:1px solid var(--line);padding-top:16px}
+.timeline-note{margin:5px 0 13px;font-size:12px}
+.gait-btn .beat-count{display:block!important;visibility:visible!important;opacity:.85!important}
+.preview-col,.export-col{min-width:0}
+.player-settings{display:grid;grid-template-columns:minmax(0,1fr);gap:9px}
+.combined-grid{align-items:start}
+.advanced-body>.section h2{font-size:15px}
+@media(max-width:700px){.editor-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.sample-review-row{align-items:flex-start;flex-direction:column}.sample-actions{flex-wrap:wrap}.sample-editor{padding:16px}.tool-button{min-height:38px}.layer-mix-row{gap:12px}}
+@media(max-width:400px){.editor-grid{grid-template-columns:minmax(0,1fr)}.gaits{gap:5px}.gait-btn{font-size:12px;padding-inline:4px}.layer-mix-row{grid-template-columns:1fr auto auto;gap:8px}}
+
+</style>
+</head>
+<body>
+
+<div class="bg-fixed"><img src="bg.jpg" alt="" onerror="this.style.display='none'"></div>
+
+<div class="modal-overlay" id="uploadModeOverlay" style="display:none">
+  <div class="modal-box" role="dialog" aria-modal="true" aria-labelledby="uploadModeTitle">
+    <h3 id="uploadModeTitle">Co zawierają wgrywane pliki?</h3>
+    <p class="hint">Wybierz opcję pasującą do Twoich nagrań - złe dopasowanie może spowodować błędne przycinanie próbek.</p>
+    <div class="upload-mode-options">
+      <button type="button" class="upload-mode-option" id="uploadModeSingle" data-mode="single">
+        <strong>Pojedyncze uderzenia</strong>
+        <span>Każdy plik zawiera dokładnie jedno uderzenie kopyta (np. 10 osobnych plików = 10 próbek).</span>
+      </button>
+      <button type="button" class="upload-mode-option" id="uploadModeMulti" data-mode="multi">
+        <strong>Nagrania z wieloma uderzeniami</strong>
+        <span>Program wykryje kandydatów na kontakty. Sprawdź grupy i granice przed ich użyciem.</span>
+      </button>
+    </div>
+    <div class="modal-actions">
+      <button type="button" class="modal-cancel-btn" id="uploadModeCancel">Anuluj</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="presetIoOverlay" style="display:none">
+  <div class="modal-box preset-io-box" role="dialog" aria-modal="true" aria-labelledby="presetIoTitle">
+    <h3 id="presetIoTitle">Własne presety</h3>
+    <p class="hint">Zapisz bieżące ustawienia chodu i charakteru konia pod własną nazwą albo wczytaj jeden z zapisanych wcześniej presetów.</p>
+    <p class="hint" style="margin-top:-6px;color:var(--gold-hi)">⚠ Preset zapisuje tylko ustawienia (suwaki, wybrany chód itd.) - <strong>nie zapisuje samych plików audio</strong>. Wczytując preset na nowo, pamiętaj o wgraniu tych samych próbek dźwiękowych.</p>
+    <div class="preset-io-save-row">
+      <div class="field">
+        <label>Nazwa nowego presetu</label>
+        <input type="text" id="presetIoNameInput" class="preset-io-input" maxlength="40" placeholder="np. Mój ciężki kłusak">
+      </div>
+      <button type="button" class="preset-io-save-btn" id="presetIoSaveBtn">Zapisz</button>
+    </div>
+    <div class="preset-io-divider">Twoje presety</div>
+    <ul class="preset-io-list" id="presetIoList"></ul>
+    <p class="preset-io-empty" id="presetIoEmpty">Nie masz jeszcze żadnych zapisanych presetów.</p>
+    <div class="modal-actions">
+      <button type="button" class="modal-cancel-btn" id="presetIoClose">Zamknij</button>
+    </div>
+  </div>
+</div>
+
+<div class="wrap">
+  <header class="hero">
+    <div class="language-switch" role="group" aria-label="Language / Język">
+      <button type="button" class="language-btn active" data-language="en" aria-pressed="true">EN</button>
+      <button type="button" class="language-btn" data-language="pl" aria-pressed="false">PL</button>
+    </div>
+    <div class="hero-copy">
+      <div class="hero-brand"><a href="https://pawlikaudio.com/" target="_blank" rel="noopener" style="color:inherit;text-decoration:none">BY PAWLIKAUDIO</a></div>
+      <h1><strong class="hero-title-reload" onclick="location.reload()" style="cursor:pointer;font-weight:inherit;display:inline!important">RUCH KONIA</strong></h1>
+      <div class="subtitle">Generator realistycznych sekwencji kopyt</div>
+      <p class="hero-desc">Twórz naturalny rytm i charakter ruchu konia z własnych próbek audio.</p>
+      <p class="development-note"><span>Narzędzie jest cały czas testowane i rozwijane. Zachęcam do testowania oraz podzielenia się swoją opinią</span> <a id="feedbackLink" href="https://docs.google.com/forms/d/e/1FAIpQLSfuL5t3miDsmP94jOp_juv12884kxLG7l4eK-gnVNeGRxO6MQ/viewform?usp=sharing&amp;ouid=112809420632413587609" target="_blank" rel="noopener">TUTAJ</a>.</p>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="section samples-panel">
+      <div class="workflow-kicker">01</div><h2>PRÓBKI</h2>
+      <p class="hint">Możesz wgrać jedną próbkę albo kilka (np. różne twardości uderzenia) - narzędzie będzie je losowo mieszać, żeby brzmienie nie było mechaniczne.</p>
+      <div class="drop" id="drop">
+        <div><strong>PRZECIĄGNIJ I UPUŚĆ PLIKI AUDIO</strong> lub kliknij, aby wybrać pliki<span class="formats">WAV, AIFF, FLAC, MP3</span></div>
+      </div>
+      <input type="file" id="fileInput" accept="audio/*" multiple>
+      <button type="button" class="demo-samples-btn" id="loadDemoSamplesBtn">🎧 Wczytaj przykładowe próbki</button>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:17px 0 7px;font-size:13px">
+        <span style="color:#f0f1f1">ZAŁADOWANE PRÓBKI</span>
+        <span style="display:flex;align-items:center;gap:10px">
+          <span style="color:#a2a8aa" id="sampleCountLabel">0 plików</span>
+          <button type="button" class="clear-all-btn" id="clearAllBtn" disabled>Usuń wszystkie</button>
+        </span>
+      </div>
+      <ul class="sample-list" id="sampleList"></ul>
+      <button class="samples-toggle" id="toggleSamplesBtn" style="display:none;"></button>
+    </section>
+
+    <section class="section">
+      <div class="section-head">
+        <div>
+          <div class="workflow-kicker">02</div>
+          <h2>CHÓD</h2>
+        </div>
+        <button type="button" class="reset-tile-btn" data-reset="chod">Domyślne</button>
+      </div>
+      <div class="gaits" id="gaits">
+        <div class="gait-btn" data-gait="walk">STĘP<span class="beat-count">4-Beat</span></div>
+        <div class="gait-btn" data-gait="trot">KŁUS<span class="beat-count">2-Beat</span></div>
+        <div class="gait-btn" data-gait="canter">GALOP<span class="beat-count">3-Beat</span></div>
+        <div class="gait-btn" data-gait="gallop">CWAŁ<span class="beat-count">4-Beat</span></div>
+      </div>
+      <div class="controls-grid" style="border-top:1px solid var(--line-soft);padding-top:18px">
+        <div>
+          <div class="field">
+            <label>TEMPO <span class="val" id="tempoVal">55</span></label>
+            <input type="range" id="tempo" min="20" max="220" value="45">
+          </div>
+          <div class="field">
+            <label>INTENSYWNOŚĆ <span class="val" id="energyVal">60%</span></label>
+            <input type="range" id="energy" min="5" max="220" value="58">
+          </div>
+        </div>
+        <div>
+          <div class="field">
+            <label>HUMANIZACJA <span class="val" id="jitterVal">7%</span></label>
+            <input type="range" id="jitter" min="0" max="100" value="7">
+          </div>
+        </div>
+      </div>
+      <div style="margin-top:2px">
+        <div class="field"><label>PRZEJŚCIA MIĘDZY CHODAMI</label><select id="transitionMode">
+          <option value="none" selected>Brak (jeden chód)</option>
+          <option value="walk-trot">Stęp → Kłus</option>
+          <option value="trot-canter">Kłus → Galop</option>
+          <option value="canter-gallop">Galop → Cwał</option>
+          <option value="walk-trot-canter">Stęp → Kłus → Galop</option>
+          <option value="custom">Pełna sekwencja (Stęp→Kłus→Galop→Cwał)</option>
+        </select></div>
+      </div>
+    </section>
+
+
+    <section class="section preset-section">
+      <div class="section-head">
+        <div>
+          <div class="workflow-kicker">03</div>
+          <h2>CHARAKTER KONIA</h2>
+        </div>
+        <button type="button" class="preset-io-btn" id="presetIoBtn">Zapisz / wczytaj preset</button>
+      </div>
+      <p class="hint" style="margin:-6px 0 14px">Preset ustawia od razu kilkanaście parametrów biomechaniki, masy i naturalności. Wybierz punkt wyjścia, a szczegóły dostrój ręcznie poniżej.</p>
+      <div class="preset-body">
+        <div class="preset-icon" id="presetIcon">⚪</div>
+        <div class="preset-select-wrap">
+          <label>PRESET</label>
+          <select id="characterPreset">
+            <option value="czysty">⚪ Czysty / bez modyfikacji</option>
+            <option value="realistyczny" selected>🐴 Realistyczny</option>
+            <option value="lekki">🐎 Lekki koń</option>
+            <option value="ciezki">🐴 Ciężki koń</option>
+            <option value="sportowy">🏇 Sportowy</option>
+            <option value="mlody">🐎 Młody / energiczny</option>
+            <option value="zmeczony">🐴 Zmęczony</option>
+            <option value="spokojny">🐎 Spokojny</option>
+            <option value="agresywny">⚡ Agresywny / dynamiczny</option>
+            <option value="filmowy">🎬 Filmowy</option>
+            <option value="custom" disabled>✎ Własne (zmienione ręcznie)</option>
+          </select>
+        </div>
+        <p class="preset-desc" id="presetDescription">Słychać przesłane próbki w niemal niezmienionej formie, ułożone tylko w rytm wybranego chodu.</p>
+      </div>
+    </section>
+
+    <section class="section saddle-section">
+      <div class="section-head">
+        <div>
+          <div class="workflow-kicker">OPTIONAL LAYER</div>
+          <h2>SIODŁO</h2>
+        </div>
+      </div>
+      <div class="saddle-controls">
+        <div>
+          <label class="saddle-toggle">
+            <input type="checkbox" id="saddleEnabled">
+            <span class="saddle-toggle-box"></span>
+            <span class="saddle-toggle-copy"><strong>Dodaj ruch siodła</strong><small>Inteligentnie dopasowuje skórzane skrzypienia i ruch siodła do wybranego chodu.</small></span>
+          </label>
+          <div class="saddle-state" id="saddleState">Warstwa siodła jest wyłączona.</div>
+        </div>
+      </div>
+    </section>
+
+    <details class="advanced">
+      <summary><span class="summary-step">✎</span><span><b>DOSTOSUJ RĘCZNIE</b><small>Precyzyjne sterowanie każdym parametrem - biomechanika, masa, warianty i naturalność</small></span></summary>
+      <div class="advanced-body">
+        <section class="section">
+          <div class="section-head">
+            <h2>Tempo i przejścia</h2>
+            <button type="button" class="reset-tile-btn" data-reset="tempo">Domyślne</button>
+          </div>
+          <div class="field" id="leadField" style="display:none"><label>Przewaga galopu</label><select id="leadSelect"><option value="right" selected>Prawa noga prowadząca</option><option value="left">Lewa noga prowadząca</option></select></div>
+          <div class="controls-grid">
+            <div class="field"><label><span class="label-text">Tempo - przyspieszenie / zwolnienie (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Dodatnia wartość stopniowo przyspiesza tempo w trakcie nagrania, ujemna - zwalnia je.</span></span></span> <span class="val" id="tempoChangeVal">0</span></label><input type="range" id="tempoChange" min="-85" max="85" value="0"></div>
+            <div class="field"><label><span class="label-text">Czas zmiany tempa (s)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Czas, w jakim tempo dojdzie do docelowej wartości ustawionej powyżej.</span></span></span> <span class="val" id="tempoChangeTimeVal">2.5</span></label><input type="range" id="tempoChangeTime" min=".2" max="15" value="2.5" step=".1"></div>
+            <div class="field"><label><span class="label-text">Czas do pierwszego przejścia (s)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Moment nagrania, w którym koń zaczyna zmieniać chód (dotyczy trybów z kilkoma chodami).</span></span></span> <span class="val" id="transitionAtVal">0</span></label><input type="range" id="transitionAt" min="0" max="30" value="0" step=".5"></div>
+            <div class="field"><label><span class="label-text">Czas przejścia między chodami (s)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Jak długo trwa płynne przejście z jednego chodu do kolejnego.</span></span></span> <span class="val" id="transitionDurVal">2.5</span></label><input type="range" id="transitionDur" min=".3" max="12" value="2.5" step=".1"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-head">
+            <h2>Biomechanika chodu</h2>
+            <button type="button" class="reset-tile-btn" data-reset="biomechanika">Domyślne</button>
+          </div>
+          <p class="hint">Łączy fazę cyklu z ruchem czterech kończyn. Podparcie na osi jest przybliżeniem kinematycznym.</p>
+          <div class="controls-grid">
+            <div class="field"><label><span class="label-text">Prędkość ruchu (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Ogólne tempo poruszania się konia - przelicza się na BPM sekwencji kroków.</span></span></span> <span class="val" id="speedVal">100</span></label><input type="range" id="speed" min="20" max="240" value="100"></div>
+            <div class="field"><label><span class="label-text">Długość kroku (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Symuluje dłuższy lub krótszy krok, wpływając na odstępy czasowe i akcent poszczególnych uderzeń.</span></span></span> <span class="val" id="strideVal">100</span></label><input type="range" id="strideLength" min="40" max="180" value="100"></div>
+            <div class="field"><label><span class="label-text">Spójność ruchu (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Korelacja ruchu poszczególnych nóg w obrębie całego cyklu.</span></span></span> <span class="val" id="correlationVal">100</span></label><input type="range" id="cycleCorrelation" min="0" max="100" value="100" title="Im wyższa wartość, tym bardziej ruch nóg zachowuje spójność całego cyklu."></div>
+            <div class="field"><label><span class="label-text">Rozdzielenie uderzeń (ms)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Przesunięcie w czasie między kopytami tej samej pary (np. diagonalnej). W kłusie mała wartość zachowuje zwarty, naturalny akcent; większa wyraźniej rozdziela oba kontakty.</span></span></span> <span class="val" id="dissociationVal">0</span></label><input type="range" id="dissociation" min="0" max="120" value="0" step="1"></div>
+            <div class="field"><label><span class="label-text">Faza zawieszenia (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Aktywne głównie dla galopu i cwału - określa długość fazy, w której wszystkie kopyta pozostają poza podłożem.</span></span></span> <span class="val" id="suspensionVal">0</span></label><input type="range" id="suspension" min="0" max="80" value="0"></div>
+            <div class="field"><label><span class="label-text">Stabilność cyklu (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Im wyższa wartość, tym mniej losowych odchyleń od regularnego rytmu - niższa daje bardziej „żywe”, nieregularne stąpanie.</span></span></span> <span class="val" id="cycleStabilityVal">100</span></label><input type="range" id="cycleStability" min="0" max="100" value="100"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-head">
+            <h2>Masa i kontakt kopyta</h2>
+            <button type="button" class="reset-tile-btn" data-reset="charakter">Domyślne</button>
+          </div>
+          <p class="hint">Ustawienia kształtują siłę i barwę kontaktu. Masa jest profilem brzmienia.</p>
+          <div class="controls-grid">
+            <div class="field"><label><span class="label-text">Masa konia (kg)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Cięższy koń daje głębsze, mocniejsze uderzenia kopyt; lżejszy - lżejsze i szybciej wybrzmiewające.</span></span></span> <span class="val" id="massVal">500</span></label><input type="range" id="mass" min="100" max="1500" value="500" step="10"></div>
+            <div class="field"><label><span class="label-text">Różnorodność próbek (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Losowo różnicuje barwę, głośność i rytm kolejnych uderzeń tej samej próbki, by uniknąć wrażenia powtarzalności.</span></span></span> <span class="val" id="variantVal">0</span></label><input type="range" id="sampleVariant" min="0" max="100" value="0"></div>
+            <div class="field"><label><span class="label-text">Atak kopyta (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Podbija górne pasmo i skraca narastanie dźwięku w momencie kontaktu kopyta z podłożem - mocniejszy, ostrzejszy „cios”.</span></span></span> <span class="val" id="transientVal">0</span></label><input type="range" id="transient" min="0" max="200" value="0"></div>
+            <div class="field"><label><span class="label-text">Ciężar uderzenia (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Podbija niskie pasmo i wydłuża wybrzmienie uderzenia, dodając mu masy i głębi.</span></span></span> <span class="val" id="bodyVal">0</span></label><input type="range" id="body" min="0" max="200" value="0"></div>
+          </div>
+        </section>
+        <section class="section">
+          <div class="section-head">
+            <h2>Naturalność</h2>
+            <button type="button" class="reset-tile-btn" data-reset="naturalnosc">Domyślne</button>
+          </div>
+          <p class="hint">Przypisz próbki do kończyn w edytorze, jeśli znasz ich pochodzenie. Te suwaki regulują subtelną zmienność kolejnych kontaktów.</p>
+          <div class="field"><label><span class="label-text">Panorama stereo - lewa/prawa noga (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Rozstawia uderzenia lewej i prawej nogi w polu stereo, symulując ich fizyczne położenie względem osi konia.</span></span></span> <span class="val" id="panStrengthVal">0</span></label><input type="range" id="panStrength" min="0" max="100" value="0"></div>
+          <div class="controls-grid">
+            <div class="field"><label><span class="label-text">Nierówność głośności (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Losowe różnice głośności między kolejnymi uderzeniami, tak jak przy naturalnym, nie w pełni równym stąpaniu.</span></span></span> <span class="val" id="volVal">0</span></label><input type="range" id="volJitter" min="0" max="100" value="0"></div>
+            <div class="field"><label><span class="label-text">Nierówność barwy (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Losowe odchylenia wysokości/barwy dźwięku między uderzeniami, dodające naturalnej niedoskonałości.</span></span></span> <span class="val" id="pitchVal">0</span></label><input type="range" id="pitchJitter" min="0" max="50" value="0"></div>
+            <div class="field"><label><span class="label-text">Wahania tempa krok-po-kroku (%)<span class="info-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Delikatne odchylenia odstępów czasowych między kolejnymi krokami, zamiast idealnie metronomicznego rytmu.</span></span></span> <span class="val" id="driftVal">0</span></label><input type="range" id="tempoDrift" min="0" max="50" value="0"></div>
+          </div>
+        </section>
+      </div>
+    </details>
+
+
+
+    <section class="section output-panel combined-panel">
+      <div class="combined-grid">
+        <div class="preview-col">
+          <div class="section-head" style="margin-bottom:9px">
+            <div>
+              <div class="workflow-kicker">04</div>
+              <h2>PODGLĄD</h2>
+            </div>
+          </div>
+          <div class="playbar">
+            <div class="playbar-controls">
+              <button class="circle-btn play" id="playBtn" disabled>▶</button>
+              <button class="circle-btn" id="stopVisual" disabled>■</button>
+              <button class="circle-btn" id="rerollBtn" disabled>↻</button>
+              <div class="time-block"><b id="bigTempo">55</b><small>BPM<br>TEMPO</small></div>
+              <div class="time-block"><b id="bigTime">0:00.00</b><small>CZAS</small></div>
+            </div>
+            <div class="preview-wrap">
+              <canvas id="timeline" class="preview-canvas" width="1200" height="200" aria-hidden="true"></canvas>
+              <div class="playhead" id="playhead"></div>
+            </div>
+            <div class="loop-toggle-row">
+              <label class="loop-toggle">
+                <input type="checkbox" id="loopMode">
+                <span class="loop-toggle-box"></span>
+                <span class="loop-toggle-text">
+                  <strong>Tryb pętli (bezszwowe zapętlenie)<span class="info-tip loop-tip" tabindex="0"><span class="info-icon">i</span><span class="tip-bubble">Długość zostanie dopasowana do pełnego cyklu chodu, a ogon dźwięku zawinięty na początek - plik można zapętlać w DAW bez przeskoków ani powtórzeń kopyta.</span></span></strong>
+                </span>
+              </label>
+              <div class="loop-warning" id="loopWarning" style="display:none"></div>
+            </div>
+          </div>
+          <div class="timeline-legend">
+            <span><i style="background:#f0b85c"></i>Lewa przednia</span>
+            <span><i style="background:#ffc96f"></i>Prawa przednia</span>
+            <span><i style="background:#c77b54"></i>Lewa tylna</span>
+            <span><i style="background:#e0a06f"></i>Prawa tylna</span>
+          </div>
+          <div class="preview-sliders">
+            <div class="field"><label>DŁUGOŚĆ (S) <span><span class="val" id="durVal">8</span><span class="dur-actual" id="durActualVal"></span></span></label><input type="range" id="duration" min="2" max="30" value="8"></div>
+            <div class="field"><label>GŁOŚNOŚĆ KOPYT (DB) <span class="val" id="hoofVolumeVal">0</span></label><input type="range" id="hoofVolume" min="-24" max="6" value="0" step="0.5"></div>
+            <div class="field saddle-volume-wrap disabled" id="saddleVolumeWrap"><label>GŁOŚNOŚĆ SIODŁA (DB) <span class="val" id="saddleVolumeVal">-6</span></label><input type="range" id="saddleVolume" min="-24" max="6" value="-6" step="0.5" disabled></div>
+            <div class="field"><label>GŁOŚNOŚĆ GŁÓWNA - OBIE WARSTWY (DB) <span class="val" id="masterVolVal">0</span></label><input type="range" id="masterVolume" min="-24" max="6" value="0" step="0.5"></div>
+          </div>
+          <div class="status" id="status">Wgraj przynajmniej jedną próbkę, aby zacząć.</div>
+          <div class="status" id="variantStatus"></div>
+        </div>
+
+        <div class="export-col">
+          <div class="section-head" style="margin-bottom:9px">
+            <div>
+              <div class="workflow-kicker">05</div>
+              <h2>EKSPORT</h2>
+            </div>
+            <button type="button" class="reset-tile-btn" data-reset="output">Domyślne</button>
+          </div>
+          <div class="player-settings">
+            <div class="field"><label>FORMAT PLIKU</label><select id="fileFormat">
+              <option value="wav" selected>WAV</option>
+              <option value="mp3">MP3</option>
+            </select></div>
+            <div class="field" id="wavQualityField"><label>JAKOŚĆ WAV</label><select id="wavFormat">
+              <option value="24" selected>48 kHz / 24-bit</option>
+              <option value="16">48 kHz / 16-bit</option>
+              <option value="44">44,1 kHz / 16-bit</option>
+            </select></div>
+            <div class="field" id="mp3QualityField" style="display:none"><label>JAKOŚĆ MP3</label><select id="mp3Bitrate">
+              <option value="320">320 kb/s</option>
+              <option value="192" selected>192 kb/s</option>
+              <option value="128">128 kb/s</option>
+            </select></div>
+            <label class="loop-toggle" id="saddleStemRow" style="opacity:.42;pointer-events:none">
+              <input type="checkbox" id="exportSaddleStem" disabled>
+              <span class="loop-toggle-box"></span>
+              <span class="loop-toggle-text"><strong>Eksportuj siodło jako osobny plik</strong><small>Zapisze osobno kopyta i siodło. Opcjonalna tekstura podłoża pozostanie w ścieżce kopyt.</small></span>
+            </label>
+          </div>
+          <div class="export-action-row">
+            <div class="export-note"><strong>Gotowe do renderu?</strong><span>Eksport użyje dokładnie tego wariantu, który słyszysz w podglądzie.</span></div>
+            <button class="export" id="renderBtn" disabled>⇩ &nbsp; EKSPORTUJ</button>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+</div>
+
+<script defer src="https://cdnjs.cloudflare.com/ajax/libs/lamejs/1.2.1/lame.min.js"></script>
+<script>
+const LEGACY_TRANSLATIONS={
+    'Co zawierają wgrywane pliki?':'What do the uploaded files contain?',
+    'Wybierz opcję pasującą do Twoich nagrań - złe dopasowanie może spowodować błędne przycinanie próbek.':'Choose the option that matches your recordings - an incorrect choice may trim samples incorrectly.',
+    'Pojedyncze uderzenia':'Single hoof impacts',
+    'Każdy plik zawiera dokładnie jedno uderzenie kopyta (np. 10 osobnych plików = 10 próbek).':'Each file contains exactly one hoof impact (e.g. 10 separate files = 10 samples).',
+    'Nagrania z wieloma uderzeniami':'Multi-impact recordings',
+    'Przynajmniej jeden plik zawiera kilka lub kilkadziesiąt uderzeń kopyta nagranych pod rząd - program automatycznie je wykryje i rozdzieli.':'At least one file contains several hoof impacts recorded in sequence - the tool will automatically detect and split them.',
+    'Anuluj':'Cancel','Własne presety':'Custom presets',
+    'Zapisz bieżące ustawienia chodu i charakteru konia pod własną nazwą albo wczytaj jeden z zapisanych wcześniej presetów.':'Save the current gait and horse character settings under your own name, or load a previously saved preset.',
+    '⚠ Preset zapisuje tylko ustawienia (suwaki, wybrany chód itd.) -':'⚠ A preset saves settings only (sliders, selected gait, etc.) -',
+    'nie zapisuje samych plików audio':'it does not save the audio files',
+    '. Wczytując preset na nowo, pamiętaj o wgraniu tych samych próbek dźwiękowych.':'. When loading a preset again, remember to upload the same audio samples.',
+    'Nazwa nowego presetu':'New preset name','Zapisz':'Save','Twoje presety':'Your presets',
+    'Nie masz jeszcze żadnych zapisanych presetów.':'You do not have any saved presets yet.','Zamknij':'Close',
+    'RUCH KONIA':'HORSE MOVEMENT','Generator realistycznych sekwencji kopyt':'Realistic hoofstep sequence generator',
+    'Twórz naturalny rytm i charakter ruchu konia z własnych próbek audio.':'Create natural horse movement rhythms and character from your own audio samples.',
+    'Narzędzie jest cały czas testowane i rozwijane. Zachęcam do testowania oraz podzielenia się swoją opinią':'This tool is continuously being tested and developed. Feel free to test it and share your feedback',
+    'TUTAJ':'HERE',
+    'PRÓBKI':'SAMPLES','Możesz wgrać jedną próbkę albo kilka (np. różne twardości uderzenia) - narzędzie będzie je losowo mieszać, żeby brzmienie nie było mechaniczne.':'Upload one or several samples (for example, impacts of different hardness) - the tool will mix them randomly to avoid a mechanical sound.',
+    'PRZECIĄGNIJ I UPUŚĆ PLIKI AUDIO':'DRAG AND DROP AUDIO FILES','lub kliknij, aby wybrać pliki':'or click to choose files',
+    '🎧 Wczytaj przykładowe próbki':'🎧 Load example samples','ZAŁADOWANE PRÓBKI':'LOADED SAMPLES','0 plików':'0 files','Usuń wszystkie':'Remove all',
+    'CHÓD':'GAIT','Domyślne':'Reset','STĘP':'WALK','KŁUS':'TROT','GALOP':'CANTER','CWAŁ':'GALLOP',
+    'INTENSYWNOŚĆ':'INTENSITY','HUMANIZACJA':'HUMANIZATION','PRZEJŚCIA MIĘDZY CHODAMI':'GAIT TRANSITIONS',
+    'Brak (jeden chód)':'None (single gait)','Stęp → Kłus':'Walk → Trot','Kłus → Galop':'Trot → Canter','Galop → Cwał':'Canter → Gallop','Stęp → Kłus → Galop':'Walk → Trot → Canter','Pełna sekwencja (Stęp→Kłus→Galop→Cwał)':'Full sequence (Walk→Trot→Canter→Gallop)',
+    'CHARAKTER KONIA':'HORSE CHARACTER','Zapisz / wczytaj preset':'Save / load preset',
+    'OPTIONAL LAYER':'OPTIONAL LAYER','SIODŁO':'SADDLE','Dodaj ruch siodła':'Add saddle movement',
+    'Inteligentnie dopasowuje skórzane skrzypienia i ruch siodła do wybranego chodu.':'Intelligently matches leather creaks and saddle movement to the selected gait.',
+    'Warstwa siodła jest wyłączona.':'The saddle layer is disabled.','Ładowanie i analiza dźwięku siodła…':'Loading and analysing saddle audio…','Warstwa siodła gotowa.':'Saddle layer ready.','Nie udało się wczytać dźwięku siodła. Sprawdź folder saddle_movement.':'Could not load the saddle audio. Check the saddle_movement folder.',
+    'Generowanie osobnego pliku siodła…':'Generating separate saddle file…','Wyeksportowano dwa oddzielne pliki: kopyta oraz siodło.':'Two separate files were exported: hooves and saddle.',
+    'GŁOŚNOŚĆ SIODŁA (DB)':'SADDLE VOLUME (DB)','Eksportuj siodło jako osobny plik':'Export saddle as a separate file','Zapisze dwa oddzielne pliki: czyste kopyta oraz zsynchronizowane siodło. Plik kopyt nie będzie zawierał siodła.':'Saves two separate files: clean hooves and synchronized saddle. The hoof file will not contain saddle audio.',
+    'GŁOŚNOŚĆ KOPYT (DB)':'HOOF VOLUME (DB)','GŁOŚNOŚĆ GŁÓWNA - OBIE WARSTWY (DB)':'MASTER VOLUME - BOTH LAYERS (DB)',
+    'Preset ustawia od razu kilkanaście parametrów biomechaniki, masy i naturalności. Wybierz punkt wyjścia, a szczegóły dostrój ręcznie poniżej.':'A preset instantly sets multiple biomechanics, mass and naturalness parameters. Choose a starting point, then fine-tune the details manually below.',
+    '⚪ Czysty / bez modyfikacji':'⚪ Clean / unprocessed','🐴 Realistyczny':'🐴 Realistic','🐎 Lekki koń':'🐎 Light horse','🐴 Ciężki koń':'🐴 Heavy horse','🏇 Sportowy':'🏇 Sport horse','🐎 Młody / energiczny':'🐎 Young / energetic','🐴 Zmęczony':'🐴 Tired','🐎 Spokojny':'🐎 Calm','⚡ Agresywny / dynamiczny':'⚡ Aggressive / dynamic','🎬 Filmowy':'🎬 Cinematic','✎ Własne (zmienione ręcznie)':'✎ Custom (manually adjusted)',
+    'DOSTOSUJ RĘCZNIE':'ADJUST MANUALLY','Precyzyjne sterowanie każdym parametrem - biomechanika, masa, warianty i naturalność':'Precise control of every parameter - biomechanics, mass, variation and naturalness',
+    'Tempo i przejścia':'Tempo and transitions','Przewaga galopu':'Canter lead','Prawa noga prowadząca':'Right lead','Lewa noga prowadząca':'Left lead',
+    'Tempo - przyspieszenie / zwolnienie (%)':'Tempo - acceleration / deceleration (%)','Dodatnia wartość stopniowo przyspiesza tempo w trakcie nagrania, ujemna - zwalnia je.':'A positive value gradually increases tempo during the recording; a negative value slows it down.',
+    'Czas zmiany tempa (s)':'Tempo change time (s)','Czas, w jakim tempo dojdzie do docelowej wartości ustawionej powyżej.':'Time required for the tempo to reach the target value set above.',
+    'Czas do pierwszego przejścia (s)':'Time to first transition (s)','Moment nagrania, w którym koń zaczyna zmieniać chód (dotyczy trybów z kilkoma chodami).':'The point in the recording when the horse starts changing gait (for multi-gait modes).',
+    'Czas przejścia między chodami (s)':'Gait transition time (s)','Jak długo trwa płynne przejście z jednego chodu do kolejnego.':'Duration of the smooth transition from one gait to the next.',
+    'Biomechanika chodu':'Gait biomechanics','Modeluje relacje pomiędzy cyklem ruchu, długością kroku i fazą zawieszenia. Losowość jest nakładana na cały cykl, a nie niezależnie na każdą nogę.':'Models the relationship between the movement cycle, stride length and suspension phase. Randomness is applied to the entire cycle rather than independently to each leg.',
+    'Prędkość ruchu (%)':'Movement speed (%)','Ogólne tempo poruszania się konia - przelicza się na BPM sekwencji kroków.':'Overall horse movement speed - converted into the hoofstep sequence BPM.',
+    'Długość kroku (%)':'Stride length (%)','Symuluje dłuższy lub krótszy krok, wpływając na odstępy czasowe i akcent poszczególnych uderzeń.':'Simulates a longer or shorter stride, affecting timing and the accent of individual impacts.',
+    'Spójność ruchu (%)':'Movement coherence (%)','Korelacja ruchu poszczególnych nóg w obrębie całego cyklu.':'Correlation between individual leg movements throughout the cycle.',
+    'Rozdzielenie uderzeń (ms)':'Impact separation (ms)','Przesunięcie w czasie między kopytami tej samej pary (np. diagonalnej). W kłusie mała wartość zachowuje zwarty, naturalny akcent; większa wyraźniej rozdziela oba kontakty.':'Time offset between hooves in the same pair (for example, a diagonal pair). In trot, a low value keeps a compact natural accent; a higher value separates the contacts more clearly.',
+    'Faza zawieszenia (%)':'Suspension phase (%)','Aktywne głównie dla galopu i cwału - określa długość fazy, w której wszystkie kopyta pozostają poza podłożem.':'Primarily active for canter and gallop - controls how long all hooves remain off the ground.',
+    'Stabilność cyklu (%)':'Cycle stability (%)','Im wyższa wartość, tym mniej losowych odchyleń od regularnego rytmu - niższa daje bardziej „żywe”, nieregularne stąpanie.':'Higher values reduce random deviations from the regular rhythm; lower values create livelier, more irregular movement.',
+    'Masa i kontakt kopyta':'Mass and hoof contact','Te parametry zmieniają fizyczny charakter kontaktu kopyta oraz skalują energię całego chodu.':'These parameters change the physical character of hoof contact and scale the energy of the entire gait.',
+    'Masa konia (kg)':'Horse mass (kg)','Cięższy koń daje głębsze, mocniejsze uderzenia kopyt; lżejszy - lżejsze i szybciej wybrzmiewające.':'A heavier horse produces deeper, stronger hoof impacts; a lighter horse sounds lighter and decays faster.',
+    'Różnorodność próbek (%)':'Sample variation (%)','Losowo różnicuje barwę, głośność i rytm kolejnych uderzeń tej samej próbki, by uniknąć wrażenia powtarzalności.':'Randomly varies tone, volume and timing between uses of the same sample to avoid repetition.',
+    'Atak kopyta (%)':'Hoof attack (%)','Podbija górne pasmo i skraca narastanie dźwięku w momencie kontaktu kopyta z podłożem - mocniejszy, ostrzejszy „cios”.':'Boosts high frequencies and shortens the onset at ground contact for a stronger, sharper impact.',
+    'Ciężar uderzenia (%)':'Impact weight (%)','Podbija niskie pasmo i wydłuża wybrzmienie uderzenia, dodając mu masy i głębi.':'Boosts low frequencies and lengthens the impact decay, adding mass and depth.',
+    'Naturalność':'Naturalness','Przednie i tylne kopyto mają lekko inną barwę i głośność - tak jak w prawdziwym stąpaniu. Poniższe suwaki dokładają do tego kontrolowaną losowość.':'Front and hind hooves have slightly different tone and volume, just as in real movement. The controls below add adjustable randomness.',
+    'Panorama stereo - lewa/prawa noga (%)':'Stereo width - left/right leg (%)','Rozstawia uderzenia lewej i prawej nogi w polu stereo, symulując ich fizyczne położenie względem osi konia.':'Places left and right leg impacts across the stereo field, simulating their physical position relative to the horse.',
+    'Nierówność głośności (%)':'Volume variation (%)','Losowe różnice głośności między kolejnymi uderzeniami, tak jak przy naturalnym, nie w pełni równym stąpaniu.':'Random volume differences between consecutive impacts, as in natural, imperfect movement.',
+    'Nierówność barwy (%)':'Tone variation (%)','Losowe odchylenia wysokości/barwy dźwięku między uderzeniami, dodające naturalnej niedoskonałości.':'Random pitch and tone deviations between impacts, adding natural imperfection.',
+    'Wahania tempa krok-po-kroku (%)':'Step-to-step tempo drift (%)','Delikatne odchylenia odstępów czasowych między kolejnymi krokami, zamiast idealnie metronomicznego rytmu.':'Subtle timing variations between consecutive steps instead of a perfectly metronomic rhythm.',
+    'PODGLĄD':'PREVIEW','CZAS':'TIME','Tryb pętli (bezszwowe zapętlenie)':'Loop mode (seamless looping)','Długość zostanie dopasowana do pełnego cyklu chodu, a ogon dźwięku zawinięty na początek - plik można zapętlać w DAW bez przeskoków ani powtórzeń kopyta.':'The duration will be aligned to a complete gait cycle and the audio tail wrapped to the beginning, allowing seamless looping in a DAW.',
+    'Lewa przednia':'Left front','Prawa przednia':'Right front','Lewa tylna':'Left hind','Prawa tylna':'Right hind','DŁUGOŚĆ (S)':'DURATION (S)','GŁOŚNOŚĆ (DB)':'VOLUME (DB)',
+    'Wgraj przynajmniej jedną próbkę, aby zacząć.':'Upload at least one sample to begin.','Wgraj próbki audio, aby zacząć.':'Upload audio samples to begin.','EKSPORT':'EXPORT','FORMAT PLIKU':'FILE FORMAT','JAKOŚĆ WAV':'WAV QUALITY','JAKOŚĆ MP3':'MP3 QUALITY','Gotowe do renderu?':'Ready to render?','Eksport użyje dokładnie tego wariantu, który słyszysz w podglądzie.':'The export will use exactly the same variation you hear in the preview.','⇩   EKSPORTUJ':'⇩   EXPORT',
+    'Słychać przesłane próbki w niemal niezmienionej formie, ułożone tylko w rytm wybranego chodu.':'The uploaded samples remain almost unchanged and are arranged only into the selected gait rhythm.',
+    'Domyślny profil realistycznego stępu - lekko nierówne odstępy, zachowana zmienność siły i subtelna różnica przednich/tylnych kopyt.':'Default realistic walk profile - slightly uneven timing, natural force variation and subtle differences between front and hind hooves.',
+    'Szybszy, lżejszy chód - krótszy krok, jaśniejszy atak, mniej ciężaru w uderzeniu.':'A faster, lighter gait - shorter strides, brighter attack and less impact weight.',
+    'Wolny, masywny chód - długi krok i głębokie, ciężkie uderzenia kopyt.':'A slow, massive gait with long strides and deep, heavy hoof impacts.',
+    'Precyzyjny, mocno stabilny rytm z wyraźnym, sprężystym atakiem.':'A precise, highly stable rhythm with a clear, springy attack.',
+    'Żywe, lekko chaotyczne stąpanie z większą losowością i energią.':'Lively, slightly chaotic movement with more randomness and energy.',
+    'Nierówny, ociężały rytm - słabszy atak i większe wahania tempa.':'An uneven, heavy rhythm with a softer attack and greater tempo variation.',
+    'Łagodne, bardzo stabilne i ciche stąpanie bez gwałtownych akcentów.':'Gentle, very stable and quiet movement without sudden accents.',
+    'Mocny, ostry atak i duży ciężar uderzeń - dynamiczny, drapieżny charakter.':'Strong, sharp attack and heavy impacts for a dynamic, aggressive character.',
+    'Przesadzony, kinowy charakter - szerokie stereo i mocno podbite niskie pasmo.':'An exaggerated cinematic character with wide stereo and strongly enhanced low frequencies.',
+    'Ustawienia zostały zmienione ręcznie i nie odpowiadają już żadnemu presetowi.':'Settings were adjusted manually and no longer match a preset.',
+    'Wczytano Twój własny preset - ustawienia mogą nie odpowiadać żadnemu z gotowych charakterów.':'Your custom preset has been loaded - its settings may not match any built-in character.',
+    'Przywrócono ustawienia z poprzedniej sesji - możesz je doprecyzować ręcznie poniżej.':'Settings from the previous session were restored - you can fine-tune them manually below.',
+    'Format eksportu zmieniony.':'Export format changed.','Jakość MP3 zmieniona.':'MP3 quality changed.','Przywrócono domyślne ustawienia tego kafelka.':'This panel has been reset to its defaults.',
+    'Anulowano wgrywanie próbek.':'Sample upload cancelled.','🎧 Wczytywanie…':'🎧 Loading…','Wczytywanie przykładowych próbek…':'Loading example samples…',
+    'Nie znaleziono obsługiwanych plików audio.':'No supported audio files were found.','Pokaż mniej':'Show less','Wczytaj':'Load','Usuń preset':'Delete preset','Usuń próbkę':'Delete sample','Usuń':'Remove',
+    'Odtwarzanie zapisanego wariantu…':'Playing the saved variation…','Wznowiono odtwarzanie…':'Playback resumed…','Gotowe - ten sam wariant zostanie użyty przy eksporcie.':'Ready - the same variation will be used for export.','Wstrzymano - wciśnij odtwarzanie, aby kontynuować od tego miejsca.':'Paused - press play to continue from this point.','Zatrzymano - sekwencja wróciła do początku.':'Stopped - the sequence returned to the beginning.','Wygenerowano nowy wariant. Odsłuch i eksport użyją dokładnie tego samego wariantu.':'A new variation has been generated. Preview and export will use exactly the same variation.',
+    'Generowanie pliku MP3…':'Generating MP3…','Generowanie pliku WAV…':'Generating WAV…','Brak dostępu do biblioteki MP3 (sprawdź połączenie z internetem) - spróbuj wyeksportować WAV.':'The MP3 library is unavailable (check your internet connection) - try exporting WAV.','Coś poszło nie tak przy generowaniu pliku.':'Something went wrong while generating the file.',
+    'np. Mój ciężki kłusak':'e.g. My heavy trotter','Im wyższa wartość, tym bardziej ruch nóg zachowuje spójność całego cyklu.':'Higher values preserve stronger movement coherence between the legs throughout the cycle.',
+    'Czysty / bez modyfikacji':'Clean / unprocessed','Realistyczny':'Realistic','Lekki koń':'Light horse','Ciężki koń':'Heavy horse','Sportowy':'Sport horse','Młody / energiczny':'Young / energetic','Zmęczony':'Tired','Spokojny':'Calm','Agresywny / dynamiczny':'Aggressive / dynamic','Filmowy':'Cinematic',
+    'Stęp':'Walk','Kłus':'Trot','Galop':'Canter','Cwał':'Gallop',
+    'Podaj nazwę presetu, zanim go zapiszesz.':'Enter a preset name before saving it.','Nie udało się zapisać presetu - pamięć przeglądarki może być pełna lub zablokowana.':'The preset could not be saved - browser storage may be full or blocked.',
+    'Nie udało się wczytać żadnej próbki. Sprawdź konsolę przeglądarki, aby zobaczyć szczegóły błędów.':'No samples could be loaded. Check the browser console for error details.',
+    'Uwaga: próbek nie udało się zapisać w pamięci przeglądarki (prawdopodobnie za duże pliki) - po odświeżeniu strony trzeba je wgrać ponownie.':'Warning: the samples could not be stored in browser memory (the files may be too large) - they must be uploaded again after refreshing the page.'
+  };
+Object.assign(LEGACY_TRANSLATIONS,{"Program wykryje kandydatów na kontakty. Sprawdź grupy i granice przed ich użyciem.": "The tool detects candidate contacts. Review groups and boundaries before using them.", "Ustawienia kształtują siłę i barwę kontaktu. Masa jest profilem brzmienia.": "These controls shape contact strength and tone. Mass is a sound profile.", "Przypisz próbki do kończyn w edytorze, jeśli znasz ich pochodzenie. Te suwaki regulują subtelną zmienność kolejnych kontaktów.": "Assign samples to limbs in the editor if their origin is known. These controls adjust subtle variation between contacts.", "Łączy fazę cyklu z ruchem czterech kończyn. Podparcie na osi jest przybliżeniem kinematycznym.": "Links cycle phase to the four limbs. Timeline support intervals are a kinematic approximation.", "Zapisze osobno kopyta i siodło. Opcjonalna tekstura podłoża pozostanie w ścieżce kopyt.": "Saves hooves and saddle separately. Optional ground texture stays in the hoof stem."});
+/* Horse Movement 1.6.0. Deterministic event model, independent of audio banks.
+ * Contact phases are editable Foley calibration targets, not measured anatomy.
+ * Support intervals are a conservative kinematic approximation.
+ */
+(function(root){
+  'use strict';
+  const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
+  const mix=(a,b,t)=>a+(b-a)*t;
+  const smooth=x=>{x=clamp(x,0,1);return x*x*(3-2*x);};
+  const fract=x=>x-Math.floor(x);
+  const db=x=>Math.pow(10,x/20);
+  const FEET=['LH','LF','RH','RF'];
+  const mirror=f=>({LH:'RH',RH:'LH',LF:'RF',RF:'LF'})[f];
+  const GAITS={
+    walk:{tempo:60/1.34,phase:{LH:0,LF:.24,RH:.50,RF:.74},stance:{LH:.64,LF:.64,RH:.64,RF:.64},range:[30,70],speed:1.4,length:1.876},
+    trot:{tempo:75,phase:{LH:0,LF:.50,RH:.50,RF:0},stance:{LH:.39,LF:.39,RH:.39,RF:.39},range:[55,110],speed:3.2,length:2.56},
+    canter:{tempo:60/.74,phase:{LH:0,LF:.17,RH:.17,RF:.35},stance:{LH:.34,LF:.32,RH:.34,RF:.30},range:[65,125],speed:5.5,length:4.07},
+    gallop:{tempo:150,phase:{LH:0,LF:.23,RH:.05,RF:.40},stance:{LH:.27,LF:.25,RH:.27,RF:.25},range:[90,180],speed:12,length:4.8}
+  };
+  function hash(seed,...parts){
+    let h=(seed>>>0)^0x811c9dc5;
+    for(const p of parts){const s=String(p);for(let i=0;i<s.length;i++){h^=s.charCodeAt(i);h=Math.imul(h,0x01000193);}}
+    h^=h>>>16;h=Math.imul(h,0x7feb352d);h^=h>>>15;h=Math.imul(h,0x846ca68b);return (h^(h>>>16))>>>0;
+  }
+  const unit=(s,...p)=>hash(s,...p)/4294967296;
+  const signed=(s,...p)=>2*unit(s,...p)-1;
+  const periodic=(seed,tag,x)=>.65*Math.sin(2*Math.PI*x+unit(seed,tag,1)*2*Math.PI)+.35*Math.sin(4*Math.PI*x+unit(seed,tag,2)*2*Math.PI);
+  const DEFAULTS={gait:'walk',tempo:GAITS.walk.tempo,energy:60,jitter:7,duration:8,
+    mode:'physical',speed:100,strideLength:100,cycleCorrelation:90,dissociation:0,
+    suspension:0,cycleStability:90,mass:500,sampleVariant:35,transient:0,body:0,
+    panStrength:0,volJitter:10,pitchJitter:8,tempoDrift:3,leadSelect:'right',
+    transitionMode:'none',transitionAt:0,transitionDur:2.5,tempoChange:0,
+    tempoChangeTime:2.5,tempoChangeAt:0,loopMode:false,neutral:false,
+    saddleEnabled:false,saddleLag:35,saddleDetail:35,saddleVolume:-6,
+    hoofVolume:0,masterVolume:0,groundVolume:-18,groundEnabled:false,
+    perspective:'source',distance:1,bankNormalization:'preserve',sampleSurface:'any',samplePerspective:'any',mixProcessing:'none',limiter:true,
+    exportProcessing:'linked',dither:true,fileFormat:'wav',wavFormat:'24',mp3Bitrate:192,
+    exportSaddleStem:false,hoofMute:false,saddleMute:false,groundMute:false,
+    hoofSolo:false,saddleSolo:false,groundSolo:false,phase1:null,phase2:null,phase3:null};
+  const BASE_PRESETS={
+    czysty:{neutral:true,energy:60,jitter:0,speed:100,strideLength:100,cycleCorrelation:100,dissociation:0,suspension:0,cycleStability:100,mass:500,sampleVariant:0,transient:0,body:0,volJitter:0,pitchJitter:0,tempoDrift:0,panStrength:0,mixProcessing:'none',limiter:false},
+    realistyczny:{...DEFAULTS},
+    lekki:{speed:108,strideLength:94,mass:320,transient:1,body:-1,volJitter:10,pitchJitter:10},
+    ciezki:{speed:85,strideLength:108,mass:950,transient:-1,body:2,volJitter:12,pitchJitter:6},
+    sportowy:{speed:115,strideLength:105,cycleStability:98,cycleCorrelation:97,transient:1,body:.5,tempoDrift:2},
+    mlody:{speed:110,strideLength:94,cycleStability:75,cycleCorrelation:80,jitter:16,volJitter:18,pitchJitter:18,tempoDrift:7},
+    zmeczony:{speed:78,strideLength:91,cycleStability:70,cycleCorrelation:82,jitter:15,transient:-1.5,body:1,volJitter:18,tempoDrift:8},
+    spokojny:{speed:90,strideLength:100,cycleStability:97,jitter:3,energy:48,transient:-1,body:0,volJitter:5,tempoDrift:2},
+    agresywny:{mode:'creative',speed:125,strideLength:105,energy:85,transient:3,body:2,volJitter:15,pitchJitter:14},
+    filmowy:{mode:'creative',energy:75,transient:2,body:4,panStrength:35,perspective:'side',mixProcessing:'gentle',limiter:true}
+  };
+  const CHARACTER_FIELDS=['neutral','mode','energy','jitter','speed','strideLength','cycleCorrelation','dissociation','suspension','cycleStability','mass','sampleVariant','transient','body','volJitter','pitchJitter','tempoDrift','panStrength','perspective','mixProcessing','limiter'];
+  function preset(key,gait){
+    const values={};for(const k of CHARACTER_FIELDS)values[k]=DEFAULTS[k];
+    if(gait==='trot')Object.assign(values,{jitter:5,cycleCorrelation:96,volJitter:8});
+    if(gait==='canter')Object.assign(values,{jitter:9,cycleCorrelation:92,volJitter:12});
+    if(gait==='gallop')Object.assign(values,{jitter:4,cycleCorrelation:96,tempoDrift:2,volJitter:10});
+    for(const [k,v] of Object.entries(BASE_PRESETS[key]||{}))if(CHARACTER_FIELDS.includes(k)&&key!=='realistyczny')values[k]=v;
+    return values;
+  }
+  function settings(input){
+    const s={...DEFAULTS,...input};if(!GAITS[s.gait])s.gait='walk';
+    const ranges={tempo:[20,220],energy:[5,220],jitter:[0,100],duration:[2,30],speed:[20,240],strideLength:[40,180],cycleCorrelation:[0,100],dissociation:[-120,120],suspension:[0,60],cycleStability:[0,100],mass:[100,1500],sampleVariant:[0,100],transient:[-12,12],body:[-12,12],panStrength:[0,100],volJitter:[0,100],pitchJitter:[0,100],tempoDrift:[0,50],tempoChange:[-85,85],tempoChangeTime:[.2,15],tempoChangeAt:[0,30],transitionAt:[0,30],transitionDur:[.3,12],saddleLag:[0,180],saddleDetail:[0,100],hoofVolume:[-60,6],saddleVolume:[-60,6],groundVolume:[-60,6],masterVolume:[-60,6],distance:[1,50]};
+    for(const [k,[lo,hi]] of Object.entries(ranges)){const n=Number(s[k]);s[k]=Number.isFinite(n)?clamp(n,lo,hi):DEFAULTS[k];}
+    for(const k of ['loopMode','neutral','saddleEnabled','groundEnabled','limiter','dither','exportSaddleStem','hoofMute','saddleMute','groundMute','hoofSolo','saddleSolo','groundSolo'])s[k]=!!s[k];
+    for(const k of ['phase1','phase2','phase3'])s[k]=s[k]===null||s[k]===''?null:(Number.isFinite(+s[k])?clamp(+s[k],0,95):null);
+    if(!['physical','creative'].includes(s.mode))s.mode='physical';
+    if(!['source','front','side','rider','mono'].includes(s.perspective))s.perspective='source';
+    if(!['none','gentle'].includes(s.mixProcessing))s.mixProcessing='none';
+    if(!['linked','dry'].includes(s.exportProcessing))s.exportProcessing='linked';
+    if(!['preserve','peak'].includes(s.bankNormalization))s.bankNormalization='preserve';
+    if(!['any','dirt','gravel','grass','sand','hard','wood'].includes(s.sampleSurface))s.sampleSurface='any';
+    if(!['any','close','front','side','rider','distant'].includes(s.samplePerspective))s.samplePerspective='any';
+    if(!['none','walk-trot','trot-canter','canter-gallop','walk-trot-canter','custom'].includes(s.transitionMode))s.transitionMode='none';
+    if(!['wav','mp3'].includes(s.fileFormat))s.fileFormat='wav';
+    if(!['16','24','32','44'].includes(String(s.wavFormat)))s.wavFormat='24';
+    if(![128,192,320].includes(+s.mp3Bitrate))s.mp3Bitrate=192;
+    if(!['right','left'].includes(s.leadSelect))s.leadSelect='right';
+    return s;
+  }
+  function gaitList(s){return ({'walk-trot':['walk','trot'],'trot-canter':['trot','canter'],'canter-gallop':['canter','gallop'],'walk-trot-canter':['walk','trot','canter'],'custom':['walk','trot','canter','gallop']})[s.transitionMode]||[s.gait];}
+  function stateAt(t,s){
+    const gs=gaitList(s);let from=gs[0],to=from,p=0;
+    if(gs.length>1&&t>s.transitionAt){const x=(t-s.transitionAt)/s.transitionDur,idx=Math.min(gs.length-1,Math.floor(x));from=gs[idx];to=gs[Math.min(idx+1,gs.length-1)];p=from===to?0:smooth(fract(x));}
+    return {from,to,p,gait:p<.5?from:to,weights:from===to?{[from]:1}:{[from]:1-p,[to]:p}};
+  }
+  function cadenceAt(t,s){
+    const g=stateAt(t,s),gs=gaitList(s),scale=s.tempo/GAITS[gs[0]].tempo;
+    const profileTempo=mix(GAITS[g.from].tempo,GAITS[g.to].tempo,g.p)*scale;
+    const ramp=smooth((t-s.tempoChangeAt)/s.tempoChangeTime);
+    // Physical mode: v=f*L. Creative mode has an explicitly independent cadence macro.
+    const multiplier=s.mode==='physical'?(s.speed/s.strideLength):Math.pow(s.speed/100,.75);
+    return clamp(profileTempo*multiplier*(1+s.tempoChange/100*ramp),12,360);
+  }
+  function phases(gait,s,period){
+    const p={...GAITS[gait].phase};
+    if(s.transitionMode==='none'){
+      const order=gait==='trot'?['RH']:gait==='canter'?['RH','RF']:['LF','RH','RF'];
+      if(gait==='gallop')order.splice(0,3,'RH','LF','RF');
+      order.forEach((f,i)=>{if(s['phase'+(i+1)]!==null)p[f]=s['phase'+(i+1)]/100;});
+      if(gait==='trot')p.LF=p.RH;
+      if(gait==='canter')p.LF=p.RH;
+    }
+    if(gait==='canter'||gait==='gallop')for(const f of FEET)p[f]*=1-s.suspension/100*.45;
+    const ds=clamp(s.dissociation/1000/period,-.16,.16);
+    if(gait==='trot'){p.RF=p.LH+ds;p.LF=p.RH+ds;}
+    if(gait==='canter')p.LF=p.RH+ds;
+    const min=Math.min(...Object.values(p));for(const f of FEET)p[f]-=min;
+    if((gait==='canter'||gait==='gallop')&&s.leadSelect==='left')return Object.fromEntries(FEET.map(f=>[mirror(f),p[f]]));
+    return p;
+  }
+  function stanceFraction(foot,g,s){
+    const f=(g==='canter'||g==='gallop')&&s.leadSelect==='left'?mirror(foot):foot;
+    return GAITS[g].stance[f];
+  }
+  function makeMotion(input,seed){
+    const s=settings(input),warnings=[],events=[],cycles=[];
+    if(s.loopMode&&(s.transitionMode!=='none'||s.tempoChange!==0))throw new Error('LOOP_STATE_MISMATCH');
+    const stability=s.cycleStability/100,corr=s.cycleCorrelation/100;
+    const drift=s.neutral?0:s.tempoDrift/100*(1-stability);
+    let phase=0,t=0,cycle=0,cycleStart=0,nextCycle=1;
+    let total=s.duration;
+    const basePeriod=60/cadenceAt(0,s);
+    if(s.loopMode){
+      const n=Math.max(2,Math.ceil(s.duration/basePeriod));total=n*basePeriod;
+      for(let c=0;c<n;c++){
+        const dur=basePeriod*(1+drift*.5*periodic(seed,'cycle',c/n));
+        const g=s.gait,p=phases(g,s,dur);
+        cycles.push({index:c,start:t,duration:dur,gait:g,weights:{[g]:1},frequency:60/dur});
+        for(const f of FEET){
+          const j=s.neutral?0:(s.jitter/100)*dur*.025*((1-corr)*signed(seed,'limb',c,f)+corr*periodic(seed,'body',c/n));
+          const when=t+p[f]*dur+j;
+          events.push({foot:f,time:when,footOn:when,footOff:when+stanceFraction(f,g,s)*dur,cycle:c,phase:p[f],gait:g,weights:{[g]:1},period:dur,energy:1});
+        }
+        t+=dur;
+      }
+      total=t;
+      for(const e of events){const shift=e.time<0?total:e.time>=total?-total:0;e.time+=shift;e.footOn+=shift;e.footOff+=shift;}
+    }else{
+      // A continuous master phase with rate-limited limb phase offsets. Each
+      // integer crossing creates exactly one contact; transitions add no voices.
+      const offsets=phases(stateAt(0,s).from,s,basePeriod),progress={},contactNumber={};
+      for(const f of FEET){progress[f]=-offsets[f];contactNumber[f]=0;if(Math.abs(progress[f])<1e-9)emit(f,0,0,basePeriod,stateAt(0,s));}
+      const dt=.002;
+      while(t<s.duration-1e-9){
+        const st=stateAt(t,s),period=60/cadenceAt(t,s);
+        const phaseNoise=drift*.5*periodic(seed,'cycle',phase/5);
+        const frequency=1/(period*(1+phaseNoise));
+        const step=Math.min(dt,s.duration-t),newPhase=phase+frequency*step;
+        const pa=phases(st.from,s,period),pb=phases(st.to,s,period);
+        for(const f of FEET){
+          let delta=pb[f]-pa[f];delta-=Math.round(delta);
+          let desired=pa[f]+delta*st.p;
+          const jitter=s.neutral?0:s.jitter/100*.02*((1-corr)*periodic(seed,'limb'+f,phase/3)+corr*periodic(seed,'body',phase/4));
+          desired+=jitter;
+          desired+=Math.round(offsets[f]-desired);
+          // The offset cannot run faster than 40% of the oscillator. This
+          // protects recovery during short user-selected transitions.
+          const offsetNext=offsets[f]+clamp(desired-offsets[f],-.40*frequency*step,.40*frequency*step);
+          const nextProgress=newPhase-offsetNext;
+          const boundary=Math.floor(progress[f]+1e-10)+1;
+          if(nextProgress>=boundary){
+            const u=(boundary-progress[f])/(nextProgress-progress[f]);
+            const at=t+step*clamp(u,0,1);
+            emit(f,at,Math.floor(newPhase),period,stateAt(at,s));
+          }
+          offsets[f]=offsetNext;progress[f]=nextProgress;
+        }
+        if(newPhase>=nextCycle){const at=t+(nextCycle-phase)/frequency;cycles.push({index:cycle++,start:cycleStart,duration:at-cycleStart,gait:st.gait,weights:st.weights,frequency:60/(at-cycleStart)});cycleStart=at;nextCycle++;}
+        phase=newPhase;t+=step;
+      }
+      if(t-cycleStart>1e-6)cycles.push({index:cycle,start:cycleStart,duration:t-cycleStart,gait:stateAt(t,s).gait,weights:stateAt(t,s).weights,frequency:cadenceAt(t,s),partial:true});
+      function emit(f,at,c,period,st){
+        const stance=mix(stanceFraction(f,st.from,s),stanceFraction(f,st.to,s),st.p);
+        events.push({foot:f,time:at,footOn:at,footOff:at+stance*period,cycle:contactNumber[f]++,phase:fract(at/period),gait:st.gait,weights:st.weights,period,energy:1});
+      }
+    }
+    events.sort((a,b)=>a.time-b.time||FEET.indexOf(a.foot)-FEET.indexOf(b.foot));
+    for(const f of FEET){
+      const list=events.filter(e=>e.foot===f);
+      for(let i=0;i<list.length;i++){
+        const e=list[i],next=list[i+1]||(s.loopMode?{time:list[0].time+total}:null);
+        if(next)e.footOff=Math.min(e.footOff,next.time-Math.min(.06,.12*e.period));
+        e.footOff=Math.max(e.time+.02,e.footOff);
+      }
+    }
+    events.forEach((e,i)=>{
+      e.id=hash(seed,'contact',e.cycle,e.foot);e.index=i;
+      const periodPhase=s.loopMode?e.time/total:e.time/5;
+      const energyBreath=s.neutral?0:s.volJitter/100*(1-.65*stability)*periodic(seed,'energy',periodPhase);
+      e.energy=clamp(1+energyBreath*.30, .55,1.45);
+    });
+    const actual=cycles.filter(c=>!c.partial),mean=actual.length?60*actual.length/actual.reduce((a,c)=>a+c.duration,0):cadenceAt(0,s);
+    const range=GAITS[s.gait].range;
+    if(mean<range[0]||mean>range[1])warnings.push('OUTSIDE_CALIBRATION');
+    if(s.mode==='physical'&&Math.abs(mean-cadenceAt(0,s))<1e-6){/* exact physical relation, no hidden bias */}
+    return {version:'1.6.0',seed:seed>>>0,settings:s,events,cycles,duration:total,meanCadence:mean,warnings,loop:s.loopMode};
+  }
+  function groupContacts(plan){
+    const groups=[],used=new Set();
+    for(let i=0;i<plan.events.length;i++){
+      if(used.has(i))continue;const e=plan.events[i];
+      const opposite=({LH:'RF',RF:'LH',RH:'LF',LF:'RH'})[e.foot];
+      const middle=plan.settings.leadSelect==='left'?['LH','RF']:['RH','LF'];
+      const eligible=e.gait==='trot'||e.gait==='canter'&&middle.includes(e.foot);
+      const distance=b=>{const d=Math.abs(b.time-e.time);return plan.loop?Math.min(d,plan.duration-d):d;};
+      const candidates=eligible?plan.events.map((b,j)=>({b,j,d:distance(b)})).filter(x=>x.j!==i&&!used.has(x.j)&&x.b.foot===opposite&&x.b.gait===e.gait&&x.d<=Math.min(.14,e.period*.24)).sort((a,b)=>a.d-b.d):[];
+      const match=candidates[0]?.j??-1;
+      if(match>=0){used.add(match);let pair=[e,plan.events[match]];
+        if(plan.loop&&Math.abs(pair[0].time-pair[1].time)>plan.duration/2)pair=pair.map(x=>x.time<plan.duration/2?{...x,time:x.time+plan.duration}:x);
+        groups.push(pair.sort((a,b)=>a.time-b.time));
+      }else groups.push([e]);used.add(i);
+    }
+    return groups;
+  }
+  function chooseSamples(plan,bank){
+    const s=plan.settings,seed=plan.seed,result=[],warnings=[],history=new Map(),neutralCursor=new Map();
+    function choose(candidates,e,kind){
+      if(s.neutral){const index=neutralCursor.get(kind)||0;neutralCursor.set(kind,index+1);return candidates.length?candidates[index%candidates.length]:null;}
+      const desired=clamp((s.energy/120)*e.energy*Math.pow(s.mass/500,.12),0,1);
+      const recent=history.get(kind)||[];
+      const scored=candidates.map(a=>({a,score:Math.abs((a.strength??.5)-desired)*.8+(recent.includes(a.id)?2:0)+unit(seed,'sample',e.id,a.id)*.3})).sort((a,b)=>a.score-b.score);
+      const picked=scored[0]?.a;if(picked){recent.push(picked.id);if(recent.length>Math.min(3,Math.max(0,candidates.length-1)))recent.shift();history.set(kind,recent);}return picked;
+    }
+    const usable=bank.filter(a=>a.approved!==false&&a.kind!=='reference'&&a.kind!=='group'&&(s.sampleSurface==='any'||a.surface===s.sampleSurface)&&(s.samplePerspective==='any'||a.perspective===s.samplePerspective));
+    const singles=usable.filter(a=>a.kind==='single'),pairs=usable.filter(a=>a.kind==='pair');
+    const bankPeak=Math.max(1e-6,...usable.map(a=>a.peak||0));
+    const bankGain=!s.neutral&&s.bankNormalization==='peak'?clamp(db(-12)/bankPeak,db(-30),db(18)):1;
+    const matchesGait=(a,e)=>!a.gait||a.gait==='any'||a.gait===e.gait;
+    for(const group of groupContacts(plan)){
+      const pairCandidates=pairs.filter(a=>matchesGait(a,group[0]));
+      const pair=group.length===2&&pairCandidates.length?choose(pairCandidates,group[0],'pair'):null;
+      const inputs=pair?[{e:group[0],sample:pair,feet:group.map(e=>e.foot),pair:true}]:group.map(e=>({e,sample:choose(singles.filter(a=>matchesGait(a,e)&&(!a.foot||a.foot==='any'||a.foot===e.foot)),e,'single'),feet:[e.foot],pair:false}));
+      for(const {e,sample,feet,pair:isPair} of inputs){
+        if(!sample){warnings.push('NO_SINGLE_SAMPLE');continue;}
+        const neutral=s.neutral,v=s.sampleVariant/100;
+        const tone=neutral?0:signed(seed,'tone',e.id)*v*.6;
+        const pitchCents=neutral?0:signed(seed,'pitch',e.id)*(s.pitchJitter+v*8);
+        const rate=Math.pow(2,pitchCents/1200);
+        const massTilt=neutral?0:clamp(Math.log2(s.mass/500)*.8,-1.5,1.5);
+        const gainVariation=neutral?0:signed(seed,'gain',e.id)*s.volJitter/100*(s.mode==='creative'?6:3);
+        let gain=(s.energy/60)*e.energy*db(gainVariation+massTilt)*bankGain;
+        const pairMember=group.length===2&&!isPair;
+        const spread=s.panStrength/100;
+        let pan=0;
+        if(!neutral&&s.perspective!=='mono'&&spread){
+          const side=e.foot[0]==='L'?-1:1;
+          pan=side*spread*(s.perspective==='rider'?.45:.25);
+          if(s.perspective==='side')pan=(e.foot[1]==='F'?.28:-.28)*spread;
+          if(isPair)pan=0;
+        }
+        const attack=sample.onset-sample.start;
+        const duration=(sample.end-sample.start)/rate;
+        result.push({id:e.id,foot:e.foot,feet,cycle:e.cycle,gait:e.gait,assetId:sample.assetId,sampleId:sample.id,
+          time:e.time-attack/rate,contactTime:e.time,sourceStart:sample.start,sourceDuration:sample.end-sample.start,
+          duration,rate,gain,pan,lowDb:neutral?0:clamp(s.body+massTilt+tone,-12,12),highDb:neutral?0:clamp(s.transient+tone,-12,12),
+          cutoff:neutral||s.perspective==='source'?null:Math.max(2200,20000/Math.sqrt(s.distance)),
+          distanceGain:neutral||s.perspective==='source'?1:1/Math.sqrt(s.distance),neutral,kind:isPair?'pair':'single',pairMember,
+          attackOffset:attack/rate,fadeIn:neutral?0:Math.min(.0008,Math.max(0,attack/rate*.8)),fadeOut:neutral?0:Math.min(.008,duration*.1)});
+      }
+    }
+    // Audio-aware correlation compensation is applied by HorseAudio, after
+    // selection. Time proximity alone never attenuates a contact here.
+    return {hits:result.sort((a,b)=>a.contactTime-b.contactTime),warnings:[...new Set(warnings)]};
+  }
+  root.HorseMotion={VERSION:'1.6.0',GAITS,FEET,DEFAULTS,CHARACTER_FIELDS,BASE_PRESETS,settings,preset,hash,unit,signed,periodic,clamp,mix,smooth,fract,db,mirror,gaitList,stateAt,cadenceAt,phases,makeMotion,groupContacts,chooseSamples};
+  if(typeof module!=='undefined')module.exports=root.HorseMotion;
+})(typeof globalThis!=='undefined'?globalThis:this);
+
+(function(root){
+  'use strict';
+  const M=root.HorseMotion,{clamp,db,hash,unit,signed}=M;
+  const yieldFrame=()=>new Promise(r=>setTimeout(r,0));
+  const quantile=(a,q)=>{if(!a.length)return 0;const x=Array.from(a).sort((a,b)=>a-b);return x[Math.min(x.length-1,Math.floor(q*x.length))];};
+  const levelDb=x=>20*Math.log10(Math.max(1e-12,x));
+  async function analyze(buffer,onProgress=()=>{}){
+    const sr=buffer.sampleRate,hop=Math.max(16,Math.round(sr*.002)),n=Math.ceil(buffer.length/hop);
+    const channels=Array.from({length:buffer.numberOfChannels},(_,c)=>buffer.getChannelData(c));
+    const env=new Float32Array(n),low=new Float32Array(n),high=new Float32Array(n);
+    const states=channels.map(()=>({l:0,m:0}));
+    const aLow=1-Math.exp(-2*Math.PI*200/sr),aMid=1-Math.exp(-2*Math.PI*2000/sr);
+    let peak=0,total=0;
+    for(let fi=0;fi<n;fi++){
+      const start=fi*hop,end=Math.min(buffer.length,start+hop);let e=0,l=0,h=0;
+      for(let c=0;c<channels.length;c++)for(let i=start;i<end;i++){
+        const x=Number.isFinite(channels[c][i])?channels[c][i]:0,st=states[c];
+        st.l+=aLow*(x-st.l);st.m+=aMid*(x-st.m);
+        e+=x*x;l+=st.l*st.l;h+=(x-st.m)*(x-st.m);peak=Math.max(peak,Math.abs(x));
+      }
+      const count=(end-start)*channels.length;env[fi]=Math.sqrt(e/count);low[fi]=Math.sqrt(l/count);high[fi]=Math.sqrt(h/count);total+=e;
+      if(fi%1200===0){onProgress(fi/n*.7);await yieldFrame();}
+    }
+    const floor=quantile(env,.20),median=quantile(env,.5),p95=quantile(env,.95);
+    const noise=Math.max(1e-7,Math.min(floor,p95*.10));
+    const novelty=new Float32Array(n);
+    let prev=env[0]||0,prevHigh=high[0]||0;
+    for(let i=1;i<n;i++){
+      // Positive multi-band energy change also responds while a previous tail
+      // remains audible. No mandatory 30-ms silence/re-arm gate.
+      novelty[i]=Math.max(0,env[i]-prev*1.10)+.65*Math.max(0,high[i]-prevHigh*1.10);
+      prev=prev*.58+env[i]*.42;prevHigh=prevHigh*.58+high[i]*.42;
+    }
+    const maxNovel=Math.max(1e-7,...novelty.subarray(0,Math.min(n,60000)));
+    const threshold=Math.max(noise*.55,maxNovel*.012,1e-6);
+    const candidates=[];
+    for(let i=2;i<n-2;i++){
+      const localFloor=Math.min(median,env[Math.max(0,i-8)]);
+      if(novelty[i]<threshold||novelty[i]<novelty[i-1]||novelty[i]<=novelty[i+1]||env[i]<Math.max(noise*2.2,localFloor*1.12))continue;
+      let at=i;
+      for(let j=i;j>=Math.max(0,i-5);j--){if(env[j]<env[i]*.15||novelty[j]<novelty[i]*.12){at=j;break;}at=j;}
+      const prior=candidates.at(-1);
+      if(prior&&(i-prior.peakFrame)*hop/sr<.012){if(novelty[i]>prior.novelty)Object.assign(prior,{frame:at,peakFrame:i,novelty:novelty[i]});}
+      else candidates.push({frame:at,peakFrame:i,novelty:novelty[i]});
+    }
+    // Join only extremely close detections into a REVIEWABLE group. It is not
+    // silently presented to the motion renderer as an individual hoof.
+    const clustered=[];
+    for(const c of candidates){const last=clustered.at(-1);if(last&&(c.frame-last.at(-1).frame)*hop/sr<.045)last.push(c);else clustered.push([c]);}
+    const segments=[];
+    for(let i=0;i<clustered.length;i++){
+      const group=clustered[i],first=group[0],last=group.at(-1),next=clustered[i+1]?.[0];
+      const onset=Math.max(0,first.frame*hop/sr),start=Math.max(0,onset-.008);
+      const stop=next?Math.max(last.peakFrame+1,next.frame-1):n-1;
+      let endFrame=Math.min(stop,last.peakFrame+Math.round(.8*sr/hop)),quiet=0;
+      for(let j=last.peakFrame+1;j<endFrame;j++){
+        if(env[j]<Math.max(noise*1.8,env[last.peakFrame]*.015))quiet++;else quiet=0;
+        if(quiet>=6){endFrame=j;break;}
+      }
+      const end=Math.min(buffer.duration,Math.max(onset+.020,(endFrame+1)*hop/sr));
+      const dense=group.length>1;
+      const confidence=clamp(first.novelty/(threshold*8),.35,.98)*(dense?.60:1);
+      segments.push({start,onset,end,kind:dense?'group':'single',approved:!dense&&confidence>=.65,confidence,
+        onsets:group.map(p=>p.frame*hop/sr),tailOverlap:!!next&&env[Math.max(0,next.frame-1)]>Math.max(noise*2,env[last.peakFrame]*.03)});
+    }
+    onProgress(.9);
+    const descriptor={peak,rms:Math.sqrt(total/(buffer.length*channels.length)),noise,
+      lowRatio:low.reduce((sum,v)=>sum+v*v,0)/Math.max(1e-12,env.reduce((sum,v)=>sum+v*v,0)),
+      highRatio:high.reduce((sum,v)=>sum+v*v,0)/Math.max(1e-12,env.reduce((sum,v)=>sum+v*v,0))};
+    onProgress(1);return {segments,env,hop,sampleRate:sr,...descriptor};
+  }
+  function descriptor(buffer,region){
+    const a=Math.max(0,Math.floor(region.start*buffer.sampleRate)),b=Math.min(buffer.length,Math.ceil(region.end*buffer.sampleRate));
+    let peak=0,sum=0,n=0,weighted=0,lowPower=0,highPower=0,peakTime=0;
+    const lowAlpha=1-Math.exp(-2*Math.PI*200/buffer.sampleRate),midAlpha=1-Math.exp(-2*Math.PI*2000/buffer.sampleRate);
+    for(let c=0;c<buffer.numberOfChannels;c++){const d=buffer.getChannelData(c);let low=0,mid=0;for(let i=a;i<b;i++){const x=Number.isFinite(d[i])?d[i]:0;if(Math.abs(x)>peak){peak=Math.abs(x);peakTime=i/buffer.sampleRate;}sum+=x*x;weighted+=(i-a)*x*x;low+=lowAlpha*(x-low);mid+=midAlpha*(x-mid);lowPower+=low*low;highPower+=(x-mid)**2;n++;}}
+    return {peak,rms:Math.sqrt(sum/Math.max(1,n)),energyTime:weighted/Math.max(sum,1e-12)/buffer.sampleRate,lowRatio:lowPower/Math.max(1e-12,sum),highRatio:highPower/Math.max(1e-12,sum),attackDuration:Math.max(0,peakTime-(region.onset??region.start)),tailDuration:Math.max(0,region.end-peakTime)};
+  }
+  function compensateCloseHits(hits,assets){
+    const result=hits.map(e=>({...e})),groups=[];
+    for(const e of result){const last=groups.at(-1);if(last&&e.contactTime-last.at(-1).contactTime<.045)last.push(e);else groups.push([e]);}
+    for(const group of groups){
+      if(group.length<2||group.every(e=>e.neutral))continue;
+      const start=Math.min(...group.map(e=>e.time)),end=Math.min(start+.12,Math.max(...group.map(e=>e.time+e.duration)));
+      let independent=0,combined=0;
+      for(let t=start;t<end;t+=1/12000)for(let c=0;c<2;c++){
+        let sum=0;
+        for(const e of group){const asset=assets.get(e.assetId);if(!asset)continue;const age=t-e.time;if(age<0||age>=e.duration)continue;
+          const b=asset.buffer,d=b.getChannelData(Math.min(c,b.numberOfChannels-1)),x=(e.sourceStart+age*e.rate)*b.sampleRate,i=Math.floor(x);
+          const v=((d[i]||0)*(1-(x-i))+(d[i+1]||0)*(x-i))*e.gain*envelope(e,age);independent+=v*v;sum+=v;
+        }
+        combined+=sum*sum;
+      }
+      // Correlated copies may add coherently. Different, uncorrelated contacts
+      // retain their summed energy. Never boost cancellations or truncate tails.
+      const scale=clamp(Math.sqrt(independent/Math.max(1e-12,combined)),1/Math.sqrt(group.length),1);
+      for(const e of group)if(!e.neutral){e.gain*=scale;e.closeGain=scale;}
+    }
+    return result;
+  }
+  function singleRegion(buffer,analysis){
+    if(!analysis.segments.length)return {start:0,onset:0,end:buffer.duration,kind:'single',approved:buffer.duration<=1.5&&analysis.peak>1e-7,confidence:.35};
+    const first=analysis.segments[0],last=analysis.segments.at(-1);
+    return {start:first.start,onset:first.onset,end:last.end,kind:'single',approved:analysis.segments.length===1&&last.end-first.start<=1.5,confidence:analysis.segments.length===1?.9:.4};
+  }
+  function importRegions(buffer,analysis,mode){
+    if(mode==='reference')return [{start:0,onset:analysis.segments[0]?.onset||0,end:buffer.duration,kind:'reference',approved:false,confidence:1}];
+    if(mode==='multi'){
+      // A file with one detected contact is still a usable contact. Keep
+      // genuinely ambiguous clusters flagged by the detector for review.
+      if(analysis.segments.length)return analysis.segments.map(r=>({...r}));
+      const region=singleRegion(buffer,analysis);
+      return [{...region,kind:region.approved?'single':'group'}];
+    }
+    const region=singleRegion(buffer,analysis);
+    // The explicit import choice describes the sound, not the number of
+    // transients in it. A hoof can have several attacks and a noisy tail.
+    // Preserve that tail; do not silently approve long recordings or silence.
+    return [{...region,end:buffer.duration,kind:mode,
+      approved:analysis.peak>1e-7&&buffer.duration<=(mode==='pair'?2:1.5)}];
+  }
+  function estimatePeriod(analysis,expected){
+    const env=analysis.env,hop=analysis.hop/analysis.sampleRate;
+    const mean=env.reduce((a,b)=>a+b,0)/env.length;
+    const lo=Math.round(Math.max(.25,expected*.78)/hop),hi=Math.round(Math.min(2.5,expected*1.22)/hop);
+    let best={period:expected,confidence:0};
+    for(let lag=lo;lag<=hi;lag++){
+      let dot=0,a2=0,b2=0;
+      for(let i=lag;i<env.length;i+=2){const a=env[i]-mean,b=env[i-lag]-mean;dot+=a*b;a2+=a*a;b2+=b*b;}
+      const corr=dot/Math.sqrt(Math.max(1e-16,a2*b2));if(corr>best.confidence)best={period:lag*hop,confidence:corr};
+    }
+    return best;
+  }
+  function saddleEvents(plan,assets){
+    const s=plan.settings,result=[],history={walk:[],other:[]};if(!s.saddleEnabled)return result;
+    for(const cyc of plan.cycles){
+      if(cyc.partial&&cyc.duration<.05)continue;
+      const period=60/cyc.frequency;
+      for(const [gait,weight] of Object.entries(cyc.weights)){
+        if(weight<.001)continue;
+        const key=gait==='walk'?'walk':'other',asset=assets[key];if(!asset)continue;
+        const length=Math.min(asset.buffer.duration,Math.max(.25,period*(gait==='walk'?1.55:1.15)));
+        const available=Math.max(0,asset.buffer.duration-length);
+        for(let pulse=0;pulse<2;pulse++){
+          const candidates=Array.from({length:8},(_,j)=>unit(plan.seed,'saddle-slice',cyc.index,pulse,key,j)*available);
+          const prev=history[key];let start=candidates.find(p=>prev.every(q=>Math.abs(p-q)>length*.55));if(start===undefined)start=candidates[0];
+          prev.push(start);if(prev.length>3)prev.shift();
+          const phase=pulse*(gait==='canter'?.42:gait==='gallop'?.38:.5);
+          const time=cyc.start+phase*period+s.saddleLag/1000-period*.22;
+          let regionRms=asset.analysis?.rms||1;
+          if(asset.analysis){const a=asset.analysis,lo=Math.floor(start*a.sampleRate/a.hop),hi=Math.min(a.env.length,Math.ceil((start+length)*a.sampleRate/a.hop));let power=0;for(let i=lo;i<hi;i++)power+=a.env[i]*a.env[i];regionRms=Math.sqrt(power/Math.max(1,hi-lo));}
+          const leveling=clamp((asset.analysis?.rms||regionRms)/Math.max(1e-8,regionRms),db(-2),db(2));
+          const energy=Math.sqrt(s.energy/60),gain=(gait==='walk'?.32:.48)*Math.sqrt(weight)*energy*leveling;
+          result.push({assetId:asset.id,time,sourceStart:start,sourceDuration:length,duration:length,rate:1,
+            gain,pan:0,kind:'saddle',gait,cycle:cyc.index,bodyPhase:phase,period,
+            modulation:(gait==='walk'?.16:.35)*s.saddleDetail/100,attackOffset:0,lowDb:0,highDb:0,
+            cutoff:gait==='walk'?9500:14000,highpass:45,fadeIn:length*.30,fadeOut:length*.45,neutral:false});
+        }
+      }
+    }
+    return result;
+  }
+  function groundEvents(plan,asset){
+    if(!plan.settings.groundEnabled||!asset)return [];
+    const length=Math.min(1.2,asset.buffer.duration),result=[];
+    for(const e of plan.events){
+      const time=e.footOff-.035;
+      result.push({assetId:asset.id,time,sourceStart:unit(plan.seed,'ground',e.id)*Math.max(0,asset.buffer.duration-length),sourceDuration:Math.min(length,e.period*.25),duration:Math.min(length,e.period*.25),rate:1,gain:.45*e.energy,pan:0,kind:'ground',gait:e.gait,cycle:e.cycle,lowDb:0,highDb:0,cutoff:12000,highpass:70,fadeIn:.018,fadeOut:Math.min(.1,e.period*.08),neutral:false});
+    }
+    return result;
+  }
+  function envelope(event,t){
+    const dur=event.duration;if(t<0||t>dur)return 0;
+    let v=1;
+    if(event.kind==='saddle'){
+      const u=t/dur;v=Math.sin(Math.PI*u);v*=v;
+      v*=1+event.modulation*Math.sin(4*Math.PI*(t/event.period+event.bodyPhase));
+    }else{
+      if(event.fadeIn>0&&t<event.fadeIn)v=t/event.fadeIn;
+      if(t>dur-event.fadeOut)v*=clamp((dur-t)/Math.max(1e-5,event.fadeOut),0,1);
+    }
+    return v;
+  }
+  function bounds(layers,plan){
+    let earliest=0,end=plan.duration;
+    for(const events of Object.values(layers))for(const e of events){earliest=Math.min(earliest,e.time);end=Math.max(end,e.time+e.duration+((e.cutoff||e.highpass||e.lowDb||e.highDb)? .15:0));}
+    const pad=Math.max(.012,-earliest+.006);
+    return {pad,end:end+pad+.02,length:plan.loop?plan.duration:end+pad+.02};
+  }
+  function schedule(ctx,entry,event,buffer,shift,normEvents,loopDuration){
+    const src=ctx.createBufferSource();src.buffer=buffer;src.playbackRate.value=event.rate;
+    const gain=ctx.createGain();let node=src;node.connect(gain);node=gain;
+    if(event.lowDb){const f=ctx.createBiquadFilter();f.type='lowshelf';f.frequency.value=180;f.gain.value=event.lowDb;node.connect(f);node=f;}
+    if(event.highDb){const f=ctx.createBiquadFilter();f.type='highshelf';f.frequency.value=2600;f.gain.value=event.highDb;node.connect(f);node=f;}
+    if(event.cutoff){const f=ctx.createBiquadFilter();f.type='lowpass';f.frequency.value=event.cutoff;f.Q.value=.707;node.connect(f);node=f;}
+    if(event.highpass){const f=ctx.createBiquadFilter();f.type='highpass';f.frequency.value=event.highpass;node.connect(f);node=f;}
+    if(event.pan){const p=ctx.createStereoPanner();p.pan.value=event.pan;node.connect(p);node=p;}
+    node.connect(entry);
+    const start=event.time+shift;
+    const steps=Math.max(32,Math.ceil(event.duration/0.002)),curve=new Float32Array(steps+1);
+    for(let i=0;i<=steps;i++){
+      const age=event.duration*i/steps;let value=envelope(event,age);
+      if(event.kind==='saddle'){
+        let power=0;
+        for(const e of normEvents){
+          let age2=event.time+age-e.time;
+          if(loopDuration){for(let k=-2;k<=2;k++){const w=envelope(e,age2+k*loopDuration);power+=w*w;}}
+          else {const w=envelope(e,age2);power+=w*w;}
+        }
+        value/=Math.sqrt(Math.max(.40,power));
+      }
+      curve[i]=value*event.gain*(event.distanceGain??1);
+    }
+    gain.gain.setValueCurveAtTime(curve,start,event.duration);
+    src.start(start,event.sourceStart,event.sourceDuration);
+    return src;
+  }
+  async function renderLayers(plan,layers,assetMap,rate,onProgress=()=>{}){
+    if(typeof OfflineAudioContext==='undefined')throw new Error('OFFLINE_AUDIO_UNAVAILABLE');
+    const b=bounds(layers,plan),result={},names=Object.keys(layers);
+    for(let ni=0;ni<names.length;ni++){
+      const name=names[ni],events=layers[name];
+      const loopPeriod=Math.round(plan.duration*rate)/rate;
+      let offset=b.pad,renderLength=b.end,cropStart=0,cropLength=Math.ceil(b.length*rate);
+      const longest=Math.max(.02,...events.map(e=>e.duration+.2));
+      let copies=1;
+      if(plan.loop){copies=Math.max(3,Math.ceil(longest/loopPeriod)+3);offset=loopPeriod;cropStart=loopPeriod*(copies-1);cropLength=Math.round(loopPeriod*rate);renderLength=loopPeriod*(copies+1)+longest;}
+      const ctx=new OfflineAudioContext(2,Math.ceil(renderLength*rate),rate),entry=ctx.createGain();entry.connect(ctx.destination);
+      for(let c=0;c<copies;c++)for(const e of events){
+        const asset=assetMap.get(e.assetId);if(!asset)throw new Error('MISSING_AUDIO_ASSET');
+        schedule(ctx,entry,e,asset.buffer,offset+(plan.loop?c*loopPeriod:0),events,plan.loop?loopPeriod:0);
+      }
+      const rendered=await ctx.startRendering();
+      const data=[0,1].map(ch=>rendered.getChannelData(ch).slice(Math.round(cropStart*rate),Math.round(cropStart*rate)+cropLength));
+      result[name]={data,sampleRate:rate,length:cropLength};onProgress((ni+1)/names.length);await yieldFrame();
+    }
+    return {layers:result,sampleRate:rate,duration:cropDuration(result),startPad:plan.loop?0:b.pad,loop:plan.loop};
+  }
+  function cropDuration(layers){const b=Object.values(layers)[0];return b?b.length/b.sampleRate:0;}
+  function peakOf(data){let peak=0,sum=0;for(const d of data)for(const v of d){if(!Number.isFinite(v))throw new Error('NONFINITE_AUDIO');peak=Math.max(peak,Math.abs(v));sum+=v*v;}return {peak,rms:Math.sqrt(sum/Math.max(1,data.length*data[0].length))};}
+  function oversampledPeak(data,loop=false){
+    let peak=0;
+    // 4x cubic inter-sample estimate. Reported explicitly as an estimate,
+    // not as an ITU-certified true-peak meter.
+    for(const a of data){const n=a.length,at=i=>loop?a[(i+n)%n]:(i<0||i>=n?0:a[i]);
+      for(let i=0;i<n;i++){
+        const p0=at(i-1),p1=a[i],p2=at(i+1),p3=at(i+2);peak=Math.max(peak,Math.abs(p1));
+        for(const t of [.25,.5,.75]){const v=p1+.5*t*(p2-p0+t*(2*p0-5*p1+4*p2-p3+t*(3*(p1-p2)+p3-p0)));peak=Math.max(peak,Math.abs(v));}
+      }
+    }
+    return peak;
+  }
+  function processMix(raw,input,{dry=false}={}){
+    const s=M.settings(input),rate=raw.sampleRate,n=Object.values(raw.layers)[0]?.length||0;
+    const names=Object.keys(raw.layers),layers={},sum=[new Float32Array(n),new Float32Array(n)];
+    const anySolo=['hoof','saddle','ground'].some(k=>s[k+'Solo']);
+    for(const name of names){
+      const key=name==='hooves'?'hoof':name;
+      const gain=s[key+'Mute']||anySolo&&!s[key+'Solo']?0:db(s[key+'Volume']??0)*db(s.masterVolume);
+      layers[name]=raw.layers[name].data.map(d=>Float32Array.from(d,v=>v*gain));
+      for(let c=0;c<2;c++)for(let i=0;i<n;i++)sum[c][i]+=layers[name][c][i];
+    }
+    if(s.perspective==='mono'&&!s.neutral)for(const name of names){const d=layers[name];for(let i=0;i<n;i++)d[0][i]=d[1][i]=(d[0][i]+d[1][i])*.5;}
+    if(s.perspective==='mono'&&!s.neutral)for(let i=0;i<n;i++)sum[0][i]=sum[1][i]=(sum[0][i]+sum[1][i])*.5;
+    const before=peakOf(sum),gainCurve=new Float32Array(n).fill(1);let maxReduction=0;
+    if(!dry&&!s.neutral&&(s.mixProcessing==='gentle'||s.limiter)){
+      const inputPeak=new Float32Array(n);for(let i=0;i<n;i++)inputPeak[i]=Math.max(Math.abs(sum[0][i]),Math.abs(sum[1][i]));
+      const lookahead=Math.round(rate*.005),peakFuture=new Float32Array(n),deque=[];let head=0;
+      for(let i=n+lookahead-1;i>=0;i--){
+        const v=i<n?inputPeak[i]:(raw.loop?inputPeak[i%n]:0);
+        while(deque.length>head&&deque[deque.length-1].v<=v)deque.pop();deque.push({i,v});
+        while(deque.length>head&&deque[head].i>i+lookahead)head++;
+        if(i<n)peakFuture[i]=deque[head]?.v||0;
+      }
+      let env=0,lim=1;
+      const attack=Math.exp(-1/(rate*.008)),release=Math.exp(-1/(rate*.120)),limRelease=Math.exp(-1/(rate*.06));
+      const passes=raw.loop?Math.max(3,Math.ceil(1.2/(n/rate))+1):1;
+      for(let pass=0;pass<passes;pass++)for(let i=0;i<n;i++){
+        const x=inputPeak[i],a=x>env?attack:release;env=a*env+(1-a)*x;
+        let cg=1;
+        if(s.mixProcessing==='gentle'){const over=Math.max(0,levelDb(env)+12);cg=db(-over*.5);}
+        const target=s.limiter?Math.min(1,db(-1.2)/Math.max(1e-12,peakFuture[i]*cg)):1;
+        lim=target<lim?target:limRelease*lim+(1-limRelease)*target;
+        if(pass===passes-1)gainCurve[i]=cg*lim;
+      }
+      for(let i=0;i<n;i++){maxReduction=Math.max(maxReduction,-levelDb(gainCurve[i]));for(let c=0;c<2;c++)sum[c][i]*=gainCurve[i];}
+      if(s.limiter){const p=oversampledPeak(sum,raw.loop),scale=Math.min(1,db(-1)/Math.max(1e-12,p));if(scale<1){for(let i=0;i<n;i++)gainCurve[i]*=scale;for(const ch of sum)for(let i=0;i<n;i++)ch[i]*=scale;maxReduction-=levelDb(scale);}}
+      for(const name of names)for(const ch of layers[name])for(let i=0;i<n;i++)ch[i]*=gainCurve[i];
+    }
+    const after=peakOf(sum),p4=oversampledPeak(sum,raw.loop);
+    return {data:sum,layers,sampleRate:rate,length:n,duration:n/rate,startPad:raw.startPad,loop:raw.loop,
+      metrics:{inputPeak:levelDb(before.peak),peak:levelDb(after.peak),peak4:levelDb(p4),rms:levelDb(after.rms),reduction:maxReduction,clipping:after.peak>=1||p4>=1},gainCurve};
+  }
+  function encodeWav(data,sampleRate,bits=24,dither=false,seed=1){
+    const floating=bits===32,bytes=bits/8,channels=data.length,length=data[0].length;
+    const out=new ArrayBuffer(44+length*channels*bytes),v=new DataView(out);let p=0;
+    const str=s=>{for(const c of s)v.setUint8(p++,c.charCodeAt(0));},u16=x=>{v.setUint16(p,x,true);p+=2;},u32=x=>{v.setUint32(p,x,true);p+=4;};
+    str('RIFF');u32(out.byteLength-8);str('WAVE');str('fmt ');u32(16);u16(floating?3:1);u16(channels);u32(sampleRate);u32(sampleRate*channels*bytes);u16(channels*bytes);u16(bits);str('data');u32(length*channels*bytes);
+    let state=seed>>>0;const rnd=()=>{state=(Math.imul(state,1664525)+1013904223)>>>0;return state/4294967296;};
+    for(let i=0;i<length;i++)for(let c=0;c<channels;c++){
+      let x=data[c][i];if(!Number.isFinite(x))throw new Error('NONFINITE_AUDIO');
+      if(floating){v.setFloat32(p,x,true);p+=4;continue;}
+      if(Math.abs(x)>=1)throw new Error('PCM_CLIPPING');
+      const full=bits===24?8388608:32768;
+      if(dither&&bits===16)x+=(rnd()-rnd())/full;
+      const q=clamp(Math.round(x*full),-full,full-1);
+      if(bits===24){v.setUint8(p,q&255);v.setUint8(p+1,(q>>8)&255);v.setUint8(p+2,(q>>16)&255);p+=3;}else{v.setInt16(p,q,true);p+=2;}
+    }
+    return out;
+  }
+  root.HorseAudio={analyze,descriptor,singleRegion,importRegions,estimatePeriod,compensateCloseHits,saddleEvents,groundEvents,envelope,bounds,schedule,renderLayers,processMix,peakOf,oversampledPeak,encodeWav,levelDb};
+  if(typeof module!=='undefined')module.exports=root.HorseAudio;
+})(typeof globalThis!=='undefined'?globalThis:this);
+
+(function(root){
+  'use strict';
+  const table=Uint32Array.from({length:256},(_,i)=>{for(let j=0;j<8;j++)i=(i&1)?0xedb88320^(i>>>1):i>>>1;return i>>>0;});
+  function crc32(data){let crc=0xffffffff;for(const v of data)crc=table[(crc^v)&255]^(crc>>>8);return (crc^0xffffffff)>>>0;}
+  function pack(buffer){
+    const data=new Uint8Array(buffer),name=new TextEncoder().encode('project.horseproject'),crc=crc32(data),local=30+name.length,central=local+data.length;
+    const result=new Uint8Array(central+46+name.length+22),view=new DataView(result.buffer);
+    const u16=(p,v)=>view.setUint16(p,v,true),u32=(p,v)=>view.setUint32(p,v,true);
+    u32(0,0x04034b50);u16(4,20);u32(14,crc);u32(18,data.length);u32(22,data.length);u16(26,name.length);result.set(name,30);result.set(data,local);
+    u32(central,0x02014b50);u16(central+4,20);u16(central+6,20);u32(central+16,crc);u32(central+20,data.length);u32(central+24,data.length);u16(central+28,name.length);result.set(name,central+46);
+    const end=central+46+name.length;u32(end,0x06054b50);u16(end+8,1);u16(end+10,1);u32(end+12,46+name.length);u32(end+16,central);
+    return result.buffer;
+  }
+  function unpack(buffer){
+    const view=new DataView(buffer);if(view.byteLength<30||view.getUint32(0,true)!==0x04034b50)throw new Error('Invalid project archive');
+    const flags=view.getUint16(6,true),method=view.getUint16(8,true),size=view.getUint32(18,true),rawSize=view.getUint32(22,true),nameLength=view.getUint16(26,true),extra=view.getUint16(28,true),start=30+nameLength+extra;
+    if(flags!==0||method!==0||size!==rawSize||start+size>buffer.byteLength||size>240*1024*1024)throw new Error('Unsupported or damaged project archive');
+    if(new TextDecoder().decode(new Uint8Array(buffer,30,nameLength))!=='project.horseproject')throw new Error('Not a Horse Movement project archive');
+    const data=new Uint8Array(buffer,start,size);if(crc32(data)!==view.getUint32(14,true))throw new Error('Project archive checksum mismatch');
+    return data.slice().buffer;
+  }
+  root.HorseArchive={pack,unpack,crc32};if(typeof module!=='undefined')module.exports=root.HorseArchive;
+})(typeof globalThis!=='undefined'?globalThis:this);
+
+(function(){
+  'use strict';
+  const M=HorseMotion,A=HorseAudio,$=id=>document.getElementById(id);
+  let lang='en',gait='walk',seed=(Math.random()*4294967296)>>>0,variant=1;
+  let bank=[],assets=new Map(),special={walk:null,other:null,ground:null},busy=false,dirty=false,ready=false;
+  let plan=null,hits=[],rawCache=null,rendered=null,revision=0,renderingPromise=null;
+  let audioCtx=null,player=null,playerStart=0,pausedAt=0,playing=false,raf=0,changeTimer=null,previewSource=null;
+  let displayedAll=false,presetApplying=false,editorItem=null,returnFocus=null,preparingPlayback=false,projectUrl=null,projectRevision=-1;
+  const textRecords=[],attrRecords=[];
+  const t=(pl,en)=>lang==='pl'?pl:en;
+  const wait=()=>new Promise(r=>setTimeout(r,0));
+  const defaults=M.DEFAULTS;
+  const labels={
+    walk:['Stęp','Walk'],trot:['Kłus','Trot'],canter:['Galop','Canter'],gallop:['Cwał','Gallop'],
+    single:['Pojedynczy kontakt','Single contact'],pair:['Nagrana para diagonalna','Recorded diagonal pair'],group:['Grupa - do sprawdzenia','Group - review required'],reference:['Referencja','Reference']
+  };
+  const surfaces=[['any','Dowolne / nieoznaczone','Any / unlabelled'],['dirt','Ziemia','Dirt'],['gravel','Żwir','Gravel'],['grass','Trawa','Grass'],['sand','Piasek','Sand'],['hard','Twarde podłoże','Hard surface'],['wood','Drewno','Wood']];
+  const sourcePositions=[['any','Dowolna / nieoznaczona','Any / unlabelled'],['close','Blisko','Close'],['front','Z przodu','Front'],['side','Z boku','Side'],['rider','Przy siodle','Near saddle'],['distant','Daleko','Distant']];
+  function nameOf(k){return labels[k]?t(...labels[k]):k;}
+  function markDirty(){if(ready&&!presetApplying){dirty=true;if($('projectDownload'))$('projectDownload').hidden=true;}}
+  function context(){if(!audioCtx)audioCtx=new (window.AudioContext||window.webkitAudioContext)();return audioCtx;}
+  function status(pl,en){$('status').textContent=t(pl,en);}
+  function errorMessage(e){return ({LOOP_STATE_MISMATCH:t('Pętla wymaga jednego chodu i stałego tempa. Wyłącz przejścia lub tryb pętli.','A loop requires one gait and a constant tempo. Disable transitions or loop mode.'),
+    NO_SINGLE_SAMPLE:t('Brakuje zatwierdzonych pojedynczych kontaktów dla tego chodu. Sprawdź typ i przeznaczenie próbek.','No approved single contacts match this gait. Check sample type and gait assignment.'),
+    PCM_CLIPPING:t('Poziom przekracza zakres PCM. Włącz limiter, obniż głośność lub wybierz WAV 32-bit float.','The signal exceeds the PCM range. Enable the limiter, lower the level or select 32-bit float WAV.'),
+    MISSING_AUDIO_ASSET:t('Brakuje materiału audio. Wczytaj plik lub pełny projekt.','Audio material is missing. Load the file or the complete project.'),
+    OFFLINE_AUDIO_UNAVAILABLE:t('Ta przeglądarka nie obsługuje renderowania audio.','This browser does not support offline audio rendering.'),
+    NONFINITE_AUDIO:t('Wykryto nieprawidłowe dane audio.','Invalid audio values were detected.')})[e?.message]||e?.message||String(e);}
+  const rangeSpecs={
+    tempo:[20,220,.1,'tempoVal','Cykle/min','Cycles/min','Wartość bazowa. Rzeczywista kadencja uwzględnia prędkość i długość kroku.','Base cadence. Effective cadence also accounts for speed and stride length.'],
+    energy:[5,220,1,'energyVal','Energia (%)','Energy (%)','Dobiera siłę próbki i poziom kontaktu.','Controls sample strength selection and contact level.'],
+    jitter:[0,100,1,'jitterVal','Humanizacja (%)','Humanization (%)','Niewielkie, spójne przesunięcia faz. Zero wyłącza humanizację.','Small, coherent phase variations. Zero disables humanization.'],
+    speed:[20,240,1,'speedVal','Prędkość względna (%)','Relative speed (%)','Tryb fizyczny: częstotliwość = prędkość / długość kroku.','Physical mode: frequency = speed / stride length.'],
+    strideLength:[40,180,1,'strideVal','Długość kroku (%)','Stride length (%)','Przy stałej prędkości dłuższy krok zmniejsza kadencję.','At a fixed speed, a longer stride reduces cadence.'],
+    cycleCorrelation:[0,100,1,'correlationVal','Spójność ruchu (%)','Movement coherence (%)','Większa wartość łączy mikroruchy nóg we wspólny ruch ciała.','Higher values link limb microtiming to a shared body motion.'],
+    dissociation:[-120,120,1,'dissociationVal','Rozdzielenie pary (ms)','Pair dissociation (ms)','Dodatnie: tylne kopyto wcześniej. Ujemne: przednie wcześniej. Zero: razem. Przy skrajnej kadencji odstęp jest ograniczony.','Positive: hind first. Negative: fore first. Zero: together. Separation is bounded at extreme cadences.'],
+    suspension:[0,60,1,'suspensionVal','Dodatkowa przerwa grupy (%)','Additional group gap (%)','Stylizacja odstępów w galopie i cwale. Czasy podparcia na osi są przybliżeniem.','Styles contact spacing in canter and gallop. Support intervals on the timeline are approximate.'],
+    cycleStability:[0,100,1,'cycleStabilityVal','Stabilność cyklu (%)','Cycle stability (%)','100% usuwa losowy drift cyklu. Humanizacja nóg pozostaje osobnym ustawieniem.','100% removes random cycle drift. Limb humanization is controlled separately.'],
+    mass:[100,1500,10,'massVal','Charakter masy (kg)','Mass character (kg)','Przybliżony profil siły i barwy, nie symulacja obciążenia kończyn.','An approximate strength and tone profile, not a limb-force simulation.'],
+    sampleVariant:[0,100,1,'variantVal','Różnorodność barwy (%)','Tonal variation (%)','Subtelne warianty barwy bez pomijania początku kontaktu.','Subtle tonal variation without skipping the contact onset.'],
+    transient:[-12,12,.5,'transientVal','Atak - góra (dB)','Attack - high shelf (dB)','0 dB jest neutralne. W trybie realistycznym zalecany zakres to -6 do +6 dB.','0 dB is neutral. The recommended realistic range is -6 to +6 dB.'],
+    body:[-12,12,.5,'bodyVal','Ciężar - dół (dB)','Body - low shelf (dB)','Korekcja basu. Nie zmienia granic oryginalnego nagrania.','Bass EQ. Does not change the boundaries of the source recording.'],
+    panStrength:[0,100,1,'panStrengthVal','Szerokość pozycji nóg (%)','Limb position width (%)','Zero nie dodaje panoramy. Oryginalne stereo pozostaje zachowane.','Zero adds no panning. Original stereo is preserved.'],
+    volJitter:[0,100,1,'volVal','Zmienność energii (%)','Energy variation (%)','Łączy wolną zmianę siły kroku z małymi różnicami kontaktów.','Combines slow stride-energy changes with small contact differences.'],
+    pitchJitter:[0,100,1,'pitchVal','Zmienność pitch (centy)','Pitch variation (cents)','Maksymalne odchylenie wysokości. Zmiana prędkości próbki wpływa też na jej długość.','Maximum pitch variation. Sample playback rate also changes duration.'],
+    tempoDrift:[0,50,1,'driftVal','Drift kadencji (%)','Cadence drift (%)','Wpływ maleje wraz ze stabilnością. W pętli przebieg jest okresowy.','Its effect decreases with stability. The trajectory is periodic in loop mode.'],
+    tempoChange:[-85,85,1,'tempoChangeVal','Zmiana tempa (%)','Tempo change (%)','Docelowa zmiana względem bazowej kadencji.','Target change relative to base cadence.'],
+    tempoChangeTime:[.2,15,.1,'tempoChangeTimeVal','Czas zmiany tempa (s)','Tempo ramp duration (s)','Rzeczywisty czas od początku do końca zmiany.','Actual time from the beginning to the end of the ramp.'],
+    transitionAt:[0,30,.1,'transitionAtVal','Początek przejścia (s)','Transition start (s)','Moment rozpoczęcia zmiany chodu.','When the gait transition starts.'],
+    transitionDur:[.3,12,.1,'transitionDurVal','Czas przejścia (s)','Transition duration (s)','Bardzo szybkie przejścia są wygładzane, aby zachować ciągłość ruchu nóg.','Very short transitions are smoothed to preserve limb continuity.'],
+    duration:[2,30,.1,'durVal','Długość sekwencji (s)','Sequence duration (s)','Bez pętli zachowana jest zadana długość ruchu i pełne ogony. Pętla obejmuje pełne cykle.','One-shots preserve the requested motion duration and full tails. Loops contain complete cycles.'],
+    hoofVolume:[-60,6,.5,'hoofVolumeVal','Głośność kopyt (dB)','Hoof volume (dB)','Poziom warstwy kopyt.','Hoof layer level.'],
+    saddleVolume:[-60,6,.5,'saddleVolumeVal','Głośność siodła (dB)','Saddle volume (dB)','Poziom warstwy siodła.','Saddle layer level.'],
+    masterVolume:[-60,6,.5,'masterVolVal','Głośność główna (dB)','Master volume (dB)','Poziom wszystkich warstw przed wspólną kontrolą szczytów.','All layers before shared peak control.']
+  };
+  function tag(tagName,attrs={},children=[]){const e=document.createElement(tagName);for(const [k,v] of Object.entries(attrs)){if(k==='text')e.textContent=v;else if(k==='class')e.className=v;else e.setAttribute(k,v);}for(const c of children)e.append(c);return e;}
+  function bilingual(tagName,pl,en,attrs={}){return tag(tagName,{'data-pl':pl,'data-en':en,...attrs,text:t(pl,en)});}
+  function button(id,pl,en,fn){const b=bilingual('button',pl,en,{id,type:'button',class:'tool-button'});if(fn)b.addEventListener('click',fn);return b;}
+  function check(id,pl,en,checked=false){const input=tag('input',{id,type:'checkbox'});input.checked=checked;return tag('label',{class:'tool-check'},[input,bilingual('span',pl,en)]);}
+  function select(id,pl,en,options,value){const sel=tag('select',{id});for(const [v,p,e] of options)sel.append(bilingual('option',p,e,{value:v}));sel.value=value;return tag('div',{class:'field'},[bilingual('label',pl,en,{for:id}),sel]);}
+  function number(id,pl,en,value,min,max,step){return tag('div',{class:'field'},[bilingual('label',pl,en,{for:id}),tag('input',{id,type:'number',class:'number-input',min,max,step,value:value??''})]);}
+  function upload(id,pl,en){return tag('div',{class:'field'},[bilingual('label',pl,en,{for:id}),tag('input',{id,type:'file',accept:'audio/*',class:'asset-input'})]);}
+  function controlsSection(titlePl,titleEn){const section=tag('section',{class:'section'});section.append(bilingual('h2',titlePl,titleEn));document.querySelector('.advanced-body').append(section);return section;}
+  function createExtraUI(){
+    const advanced=document.querySelector('details.advanced'),saddle=document.querySelector('.saddle-section');saddle.before(advanced);
+    const biomechanics=controlsSection('Model i kalibracja','Model and calibration');
+    biomechanics.append(select('mode','Sterowanie ruchem','Motion control',[['physical','Prędkość i długość kroku','Speed and stride length'],['creative','Kadencja kreatywna','Creative cadence']],defaults.mode));
+    biomechanics.append(select('referencePreset','Punkt odniesienia Dirt','Dirt calibration target',[
+      ['custom','Własne ustawienia','Custom settings'],['walk','Stęp - 1,34 s','Walk - 1.34 s'],['trot','Kłus - 0,80 s','Trot - 0.80 s'],['canter','Galop - 0,74 s','Canter - 0.74 s'],['gallop-slow','Cwał wolny - 0,60 s','Slow gallop - 0.60 s'],['gallop-fast','Cwał szybki - 0,40 s','Fast gallop - 0.40 s']],'custom'));
+    biomechanics.append(bilingual('p','Punkty brzmieniowe z referencji Foley. Nie są pomiarem anatomii konkretnego konia.','Sound targets from the Foley references, not anatomical measurements of a particular horse.',{class:'hint'}));
+    const geometry=tag('div',{class:'controls-grid'});
+    for(let i=1;i<=3;i++)geometry.append(number('phase'+i,'Faza '+i+' (%)','Phase '+i+' (%)',null,0,95,.1));
+    biomechanics.append(geometry,bilingual('p','Puste pole zachowuje profil chodu. Fazy są liczone od pierwszego kontaktu.','An empty field keeps the gait profile. Phases are relative to the first contact.',{class:'hint'}));
+    biomechanics.append(tag('p',{id:'motionReadout',class:'readout','data-dynamic':''}));
+    biomechanics.append(select('bankNormalization','Poziom banku próbek','Sample bank level',[['preserve','Zachowaj poziom źródłowy','Preserve source level'],['peak','Wspólny szczyt -12 dBFS','Shared peak -12 dBFS']],'preserve'),bilingual('p','Jedna wspólna korekta poziomu zachowuje różnice siły pomiędzy próbkami.','One shared level adjustment preserves strength differences between samples.',{class:'hint'}));
+    biomechanics.append(select('sampleSurface','Wybieraj próbki podłoża','Select samples by surface',surfaces,'any'),select('samplePerspective','Wybieraj perspektywę nagrania','Select samples by recorded perspective',sourcePositions,'any'),bilingual('p','Oznacz pochodzenie próbek w edytorze. Filtry wybierają materiał z banku.','Tag sample provenance in the editor. These filters select material from the bank.',{class:'hint'}));
+    const tempoTime=$('tempoChangeTime').closest('.controls-grid');tempoTime.append(number('tempoChangeAt','Początek zmiany tempa (s)','Tempo ramp start (s)',0,0,30,.1));
+    document.querySelector('.preset-section').append(check('neutral','Neutralny tor źródłowy','Neutral source path',false));
+    const space=controlsSection('Perspektywa','Perspective');
+    space.append(select('perspective','Pozycja mikrofonu','Microphone perspective',[
+      ['source','Oryginalne nagranie','Original recording'],['front','Przed koniem','In front'],['side','Z boku','At the side'],['rider','Przy siodle','Near the saddle'],['mono','Mono','Mono']],'source'),number('distance','Odległość względna','Relative distance',1,1,50,.5));
+    const saddleBank=tag('details',{class:'layer-details'});saddleBank.append(bilingual('summary','Materiał i charakter siodła','Saddle material and character'));
+    saddleBank.append(upload('saddleWalkInput','Siodło - stęp','Saddle - walk'),upload('saddleOtherInput','Siodło - pozostałe chody','Saddle - other gaits'),number('saddleLag','Opóźnienie ruchu (ms)','Movement lag (ms)',35,0,180,1),number('saddleDetail','Wyrazistość ruchu (%)','Movement detail (%)',35,0,100,1),tag('p',{id:'saddleBankNames',class:'hint','data-dynamic':''}));saddle.append(saddleBank);
+    const ground=controlsSection('Podłoże - tarcie i oderwanie','Ground - friction and lift-off');
+    ground.append(check('groundEnabled','Dodaj teksturę podłoża','Add ground texture'),upload('groundInput','Nagranie tekstury bez kopyt','Texture recording without hoof impacts'),number('groundVolume','Głośność podłoża (dB)','Ground volume (dB)',-18,-60,6,.5));
+    ground.append(bilingual('p','Użyj samego tarcia lub sypkiego materiału. Wyłącz tę warstwę, gdy próbki kopyt już zawierają taki dźwięk.','Use friction or loose material only. Disable this layer when the hoof samples already contain it.',{class:'hint'}));
+    const mix=document.querySelector('.preview-col');
+    const mixer=tag('div',{class:'layer-mixer'});
+    for(const [key,pl,en] of [['hoof','Kopyta','Hooves'],['saddle','Siodło','Saddle'],['ground','Podłoże','Ground']]){
+      const row=tag('div',{class:'layer-mix-row'});row.append(bilingual('strong',pl,en),check(key+'Mute','Wycisz','Mute'),check(key+'Solo','Solo','Solo'));mixer.append(row);
+    }
+    mix.insertBefore(mixer,$('status'));
+    const processing=tag('div',{class:'controls-grid'});processing.append(select('mixProcessing','Obróbka sumy','Bus processing',[['none','Bez kompresji','No compression'],['gentle','Łagodna kompresja','Gentle compression']],'none'),check('limiter','Limiter końcowy','Output limiter',true));
+    mix.insertBefore(processing,$('status'));mix.insertBefore(tag('p',{id:'meter',class:'meter','aria-live':'polite','data-dynamic':''}),$('status'));
+    mix.insertBefore(tag('p',{id:'durationReadout',class:'readout','data-dynamic':''}),$('status'));
+    const comparison=tag('details',{class:'layer-details'});comparison.append(bilingual('summary','Porównanie z referencją','Compare with a reference'),select('compareReference','Nagranie referencyjne','Reference recording',[]),check('compareMatch','Wyrównaj średni poziom RMS','Match average RMS level',true));
+    comparison.append(button('compareA','A - referencja','A - reference',compareReference),button('compareB','B - wygenerowany ruch','B - generated movement',()=>{stopAudition();stopPlayback(true);play();}),button('compareStop','Zatrzymaj porównanie','Stop comparison',()=>{stopAudition();stopPlayback(true);}));
+    comparison.append(bilingual('p','Wgraj referencję, wybierając „Referencja do analizy”. Wyrównanie RMS służy porównaniu i nie zmienia eksportu.','Upload a reference using “Reference for analysis”. RMS matching is for comparison and does not change the export.',{class:'hint'}));mix.insertBefore(comparison,$('status'));
+    const exporter=document.querySelector('.export-col .player-settings');
+    exporter.append(select('exportProcessing','Osobne ścieżki','Stem processing',[['linked','Wspólna redukcja - suma zgodna z miksem','Shared gain reduction - matches the mix'],['dry','Przed obróbką sumy - do dalszego miksu','Before bus processing - for mixing']],'linked'),check('dither','Dither przy WAV 16-bit','Dither for 16-bit WAV',true));
+    exporter.append(bilingual('p','Zgodność sumy dotyczy audio przed kwantyzacją i kodowaniem MP3. Do ścisłego porównania użyj WAV 32-bit float.','Stem summing matches before quantization and MP3 encoding. Use 32-bit float WAV for precise comparison.',{class:'hint'}));
+    $('wavFormat').prepend(bilingual('option','48 kHz / 32-bit float','48 kHz / 32-bit float',{value:'32'}));
+    const projects=tag('div',{class:'project-row'});projects.append(button('saveProject','Zapisz pełny projekt','Save complete project',saveProject),button('loadProject','Wczytaj projekt','Load project',()=> $('projectInput').click()),tag('input',{id:'projectInput',type:'file',accept:'.zip,.horseproject',hidden:''}));
+    const projectLink=bilingual('a','Pobierz przygotowany projekt','Download prepared project',{id:'projectDownload',class:'tool-button',hidden:''});projectLink.addEventListener('click',()=>{if(projectRevision===revision)dirty=false;});projects.append(projectLink);
+    document.querySelector('.preset-section').append(projects,bilingual('p','Projekt ZIP zawiera ustawienia, seed i zdekodowane audio PCM. Odświeżenie nadal rozpoczyna nową sesję.','A ZIP project contains settings, the seed and decoded PCM audio. Refreshing still starts a new session.',{class:'hint'}));
+    const uploadOptions=document.querySelector('.upload-mode-options');
+    uploadOptions.append(button('uploadModePair','Nagrane pary diagonalne','Recorded diagonal pairs'),button('uploadModeReference','Referencja do analizy','Reference for analysis'));
+    $('drop').setAttribute('role','button');$('drop').tabIndex=0;
+    $('playBtn').setAttribute('aria-label','Play / pause');$('stopVisual').setAttribute('aria-label','Stop');$('rerollBtn').setAttribute('aria-label','New variation');
+    $('timeline').removeAttribute('aria-hidden');$('timeline').setAttribute('role','img');
+    document.querySelector('.timeline-legend').after(bilingual('p','Słupek: kontakt. Prostokąt: szacowane podparcie. Cienka linia: wybrzmienie próbki.','Marker: contact. Bar: approximate support. Thin line: sample tail.',{class:'hint timeline-note'}));
+    for(const b of $('gaits').children){b.setAttribute('role','button');b.tabIndex=0;}
+    const editor=tag('dialog',{id:'sampleEditor',class:'sample-editor'});
+    editor.append(tag('h3',{id:'editorTitle','data-dynamic':''}),tag('canvas',{id:'editorWave',width:1100,height:220,tabindex:'0',role:'img'}));
+    const fields=tag('div',{class:'editor-grid'});
+    for(const [id,pl,en] of [['editStart','Początek wycinka (s)','Region start (s)'],['editOnset','Kontakt (s)','Contact onset (s)'],['editEnd','Koniec wycinka (s)','Region end (s)']])fields.append(number(id,pl,en,0,0,120,.001));
+    fields.append(select('editKind','Zawartość','Content',[['single','Pojedynczy kontakt','Single contact'],['pair','Para diagonalna','Diagonal pair'],['group','Niepewna grupa','Uncertain group'],['reference','Pełna referencja','Full reference']],'single'));
+    fields.append(select('editFoot','Kończyna (jeśli znana)','Limb (if known)',[['any','Dowolna','Any'],...M.FEET.map(f=>[f,f,f])],'any'));
+    fields.append(select('editGait','Przeznaczenie','Gait assignment',[['any','Dowolny chód','Any gait'],...Object.keys(M.GAITS).map(g=>[g,...labels[g]])],'any'));
+    fields.append(select('editStrength','Siła kontaktu','Contact strength',[['.25','Lekki','Soft'],['.5','Średni','Medium'],['.85','Mocny','Hard']],'.5'));
+    fields.append(select('editSurface','Podłoże w nagraniu','Recorded surface',surfaces,'any'),select('editPerspective','Perspektywa w nagraniu','Recorded perspective',sourcePositions,'any'));
+    editor.append(fields,check('editApproved','Zatwierdzam typ i granice','Approve content type and boundaries'),check('editZoom','Powiększ wycinek','Zoom to region'),tag('p',{id:'editorInfo',class:'hint','data-dynamic':''}));
+    const actions=tag('div',{class:'editor-actions'});
+    actions.append(button('editListen','Odsłuchaj wycinek','Preview region',()=>auditionEditor(false)),button('editContext','Odsłuchaj z otoczeniem','Preview with context',()=>auditionEditor(true)),button('editStop','Stop','Stop',stopAudition),button('editCalibrate','Zastosuj tempo referencji','Apply reference cadence',calibrateReference),button('editSave','Zapisz zmiany','Save changes',()=>saveEditor(false)),button('editCopy','Dodaj jako nową próbkę','Add as new sample',()=>saveEditor(true)),button('editClose','Zamknij','Close',()=>editor.close()));editor.append(actions);document.body.append(editor);
+    const loopStrong=document.querySelector('.loop-toggle-text strong');loopStrong.replaceChildren(bilingual('span','Pętla pełnych cykli','Complete-cycle loop'));
+    $('loopWarning').setAttribute('role','status');
+    const calibration=tag('p',{id:'bankWarning',class:'bank-warning','data-dynamic':'','aria-live':'polite'});$('sampleList').before(calibration);
+    document.querySelectorAll('.field input[id],.field select[id]').forEach(input=>{input.closest('.field').querySelector('label')?.setAttribute('for',input.id);});
+  }
+  function decorateRanges(){
+    for(const [id,[min,max,step,val,pl,en,tipPl,tipEn]] of Object.entries(rangeSpecs)){
+      const input=$(id);if(!input)continue;input.min=min;input.max=max;input.step=step;input.value=defaults[id];input.defaultValue=defaults[id];
+      const label=input.closest('.field').querySelector('label');label.setAttribute('for',id);
+      const value=$(val)||tag('span',{id:val,class:'val'});
+      label.replaceChildren(bilingual('span',pl,en),value);label.dataset.tipPl=tipPl;label.dataset.tipEn=tipEn;
+    }
+  }
+  function captureStaticText(){
+    const walker=document.createTreeWalker(document.body,NodeFilter.SHOW_TEXT);
+    while(walker.nextNode()){
+      const node=walker.currentNode;if(node.parentElement?.closest('script,style,[data-pl],[data-dynamic]'))continue;
+      const raw=node.nodeValue,core=raw.trim();if(!core)continue;
+      textRecords.push({node,raw,core,en:LEGACY_TRANSLATIONS[core]||core});
+    }
+    document.querySelectorAll('[title],[placeholder]').forEach(el=>{for(const key of ['title','placeholder'])if(el.hasAttribute(key)){const raw=el.getAttribute(key);attrRecords.push({el,key,raw,en:LEGACY_TRANSLATIONS[raw]||raw});}});
+  }
+  function language(value){
+    lang=value==='pl'?'pl':'en';document.documentElement.lang=lang;
+    $('playBtn').setAttribute('aria-label',t('Odtwarzaj / pauza','Play / pause'));$('stopVisual').setAttribute('aria-label','Stop');$('rerollBtn').setAttribute('aria-label',t('Losuj wariant','New variation'));
+    document.title=t('Ruch konia - generator kopyt v1.6','Horse Movement - Hoofstep Generator v1.6');
+    for(const r of textRecords)if(r.node.isConnected)r.node.nodeValue=lang==='pl'?r.raw:r.raw.replace(r.core,r.en);
+    for(const r of attrRecords)if(r.el.isConnected)r.el.setAttribute(r.key,lang==='pl'?r.raw:r.en);
+    document.querySelectorAll('[data-pl]').forEach(e=>e.textContent=e.dataset[lang]);
+    document.querySelectorAll('[data-tip-pl]').forEach(e=>e.title=lang==='pl'?e.dataset.tipPl:e.dataset.tipEn);
+    document.querySelectorAll('.language-btn').forEach(e=>{e.classList.toggle('active',e.dataset.language===lang);e.setAttribute('aria-pressed',String(e.dataset.language===lang));});
+    $('feedbackLink').href=lang==='pl'?'https://docs.google.com/forms/d/e/1FAIpQLSfuL5t3miDsmP94jOp_juv12884kxLG7l4eK-gnVNeGRxO6MQ/viewform?usp=sharing&ouid=112809420632413587609':'https://docs.google.com/forms/d/e/1FAIpQLSful1iJH-yHv3mTYSq3Ppkt40dBDTic4t9owsWC1vbvOtspoQ/viewform?usp=sharing&ouid=112809420632413587609';
+    updateValues();renderBank();renderPresets();updateSaddleNames();if(plan)drawTimeline();
+    status('Wgraj próbki lub naciśnij odtwarzanie.','Upload samples or press play.');
+  }
+  function readSettings(){
+    const s={gait};for(const [k,def] of Object.entries(defaults)){const input=$(k);if(!input)continue;s[k]=typeof def==='boolean'?input.checked:(input.type==='range'||input.type==='number'?input.value:input.value);}
+    return M.settings(s);
+  }
+  function writeSettings(s){
+    presetApplying=true;
+    for(const [k,v] of Object.entries(s)){const input=$(k);if(!input)continue;if(input.type==='checkbox')input.checked=!!v;else input.value=v??'';}
+    if(s.gait&&M.GAITS[s.gait])gait=s.gait;
+    presetApplying=false;updateValues();
+  }
+  function setGait(g,{resetTempo=true,applyPreset=true}={}){
+    if(busy)return;
+    gait=g;if(resetTempo)$('tempo').value=M.GAITS[g].tempo;
+    if(applyPreset&&$('characterPreset').value!=='custom')writeSettings(M.preset($('characterPreset').value,g));
+    for(let i=1;i<=3;i++)$('phase'+i).value='';
+    updateValues();invalidate();markDirty();
+  }
+  function applyPreset(key){writeSettings(M.preset(key,gait));$('characterPreset').value=key;updateValues();invalidate();markDirty();}
+  function updateValues(){
+    for(const [id,spec] of Object.entries(rangeSpecs)){if($(spec[3]))$(spec[3]).textContent=Number($(id).value).toFixed(+$(id).step<1?1:0);}
+    for(const b of $('gaits').children){const active=b.dataset.gait===gait;b.classList.toggle('active',active);b.setAttribute('aria-pressed',active);}
+    $('leadField').style.display=(gait==='canter'||gait==='gallop'||$('transitionMode').value!=='none')?'block':'none';
+    const s=readSettings(),neutral=s.neutral;
+    for(const k of ['jitter','cycleCorrelation','cycleStability','mass','sampleVariant','transient','body','panStrength','volJitter','pitchJitter','tempoDrift','bankNormalization','mixProcessing','limiter'])$(k).disabled=neutral;
+    $('saddleVolume').disabled=!s.saddleEnabled;$('saddleVolumeWrap').classList.toggle('disabled',!s.saddleEnabled);
+    $('exportSaddleStem').disabled=!s.saddleEnabled;$('saddleStemRow').style.opacity=s.saddleEnabled?'1':'.5';$('saddleStemRow').style.pointerEvents='';
+    $('wavQualityField').style.display=s.fileFormat==='wav'?'':'none';$('mp3QualityField').style.display=s.fileFormat==='mp3'?'':'none';
+    const profile=$('characterPreset').value;
+    $('presetDescription').textContent=profile==='czysty'?t('Oryginalna barwa, bez dodatkowej losowości, EQ i kompresji.','Original tone without added randomness, EQ or compression.'):
+      profile==='custom'?t('Własne ustawienia.','Custom settings.'):
+      ['filmowy','agresywny','zmeczony'].includes(profile)?t('Profil kreatywny. Parametry nie są diagnozą ani pomiarem konkretnego konia.','Creative profile. Parameters are not measurements of a particular horse.'):
+      t('Profil charakteru dostosowany do wybranego chodu.','Character profile adapted to the selected gait.');
+    $('presetIcon').textContent=profile==='czysty'?'⚪':'🐎';
+    const phases=M.phases(gait,{...s,phase1:null,phase2:null,phase3:null},60/M.cadenceAt(0,s));
+    const order=gait==='trot'?['RH']:gait==='canter'?['RH','RF']:gait==='gallop'?['RH','LF','RF']:['LF','RH','RF'];
+    for(let i=1;i<=3;i++){const input=$('phase'+i);input.disabled=i>order.length||s.transitionMode!=='none';input.placeholder=i<=order.length?(phases[s.leadSelect==='left'&&['canter','gallop'].includes(gait)?M.mirror(order[i-1]):order[i-1]]*100).toFixed(1):'-';input.closest('.field').querySelector('label').textContent=i<=order.length?t('Faza '+order[i-1]+' (%)','Phase '+order[i-1]+' (%)'):'-';}
+    const invalid=s.loopMode&&(s.transitionMode!=='none'||s.tempoChange!==0);
+    $('loopWarning').style.display=invalid?'block':'none';$('loopWarning').textContent=invalid?errorMessage(new Error('LOOP_STATE_MISMATCH')):'';
+    $('bigTempo').parentElement.querySelector('small').textContent=t('CYKLE/MIN','CYCLES/MIN');
+    const groupsPerCycle=gait==='walk'||gait==='gallop'?4:gait==='trot'?2:3;
+    const cadence=plan?.meanCadence||M.cadenceAt(0,s);$('bigTempo').textContent=cadence.toFixed(1);
+    $('motionReadout').textContent=t('Kadencja: ','Cadence: ')+cadence.toFixed(1)+t(' cykli/min; orientacyjnie ',' cycles/min; approximately ')+(cadence*groupsPerCycle).toFixed(0)+t(' grup akcentów/min.',' accent groups/min.');
+    $('variantStatus').textContent=t('Wariant #','Variation #')+variant+' | seed '+seed+' | v1.6';
+    $('durationReadout').textContent=rendered?t('Plik z wybrzmieniami: ','File including tails: ')+rendered.duration.toFixed(3)+' s | '+t('ruch: ','motion: ')+plan.duration.toFixed(3)+' s':t('Długość pliku zostanie obliczona z pełnymi wybrzmieniami.','File duration will include full tails.');
+    $('playBtn').disabled=busy||preparingPlayback||!bank.some(b=>b.approved&&['single','pair'].includes(b.kind))||invalid;
+    $('renderBtn').disabled=$('playBtn').disabled;$('rerollBtn').disabled=busy||!bank.length;$('clearAllBtn').disabled=busy||!bank.length;
+    $('stopVisual').disabled=!playing&&!pausedAt;
+    const info=rendered?.metrics;$('meter').textContent=info?
+      `Peak ${info.peak.toFixed(1)} dBFS | 4x ${info.peak4.toFixed(1)} dBFS | RMS ${info.rms.toFixed(1)} dBFS | ${t('redukcja','reduction')} ${info.reduction.toFixed(1)} dB${info.clipping?' | '+t('PRZEKROCZONY POZIOM','OVERLOAD'):''}`:
+      t('Miernik zostanie obliczony z przygotowanego audio. 4x oznacza oszacowanie szczytów między próbkami.','Meter values come from the prepared audio. 4x denotes an inter-sample peak estimate.');
+    if(plan?.warnings.includes('OUTSIDE_CALIBRATION'))$('motionReadout').textContent+=t(' Poza zakresem kalibracji tego chodu.',' Outside this gait’s calibration range.');
+    if(busy)document.querySelectorAll('input,select,button').forEach(e=>{if(e.dataset.wasDisabled===undefined)e.dataset.wasDisabled=e.disabled?'1':'0';e.disabled=true;});
+  }
+  function validatePhases(s){
+    if(s.transitionMode!=='none')return;
+    const currentGait=s.gait,p=M.phases(currentGait,s,60/M.cadenceAt(0,s));
+    const order=currentGait==='walk'?['LH','LF','RH','RF']:currentGait==='gallop'?['LH','RH','LF','RF']:currentGait==='canter'?['LH','RH','RF']:['LH','RH'];
+    const values=order.map(f=>p[s.leadSelect==='left'&&['canter','gallop'].includes(currentGait)?M.mirror(f):f]);
+    if(values.some((v,i)=>i>0&&v-values[i-1]<.012))throw new Error(t('Fazy kontaktów muszą zachować kolejność chodu.','Contact phases must preserve the gait order.'));
+  }
+  function rebuild(){
+    const s=readSettings();validatePhases(s);plan=M.makeMotion(s,seed);
+    const selected=M.chooseSamples(plan,bank);hits=A.compensateCloseHits(selected.hits,assets);
+    plan.warnings.push(...selected.warnings);updateValues();drawTimeline();
+    return plan;
+  }
+  function invalidate({mixOnly=false}={}){
+    revision++;rendered=null;if(!mixOnly)rawCache=null;
+    clearTimeout(changeTimer);
+    changeTimer=setTimeout(()=>{
+      try{if(!mixOnly)rebuild();else updateValues();if(playing)refreshPlayback();}
+      catch(e){status(errorMessage(e),errorMessage(e));updateValues();}
+    },90);
+  }
+  function drawTimeline(){
+    const canvas=$('timeline'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+    ctx.clearRect(0,0,w,h);ctx.fillStyle='#10181c';ctx.fillRect(0,0,w,h);if(!plan)return;
+    const colors={LH:'#c77b54',LF:'#f0b85c',RH:'#e0a06f',RF:'#ffc96f'},feet=['LF','RF','LH','RH'],left=40;
+    ctx.font='14px sans-serif';
+    feet.forEach((foot,row)=>{const y=20+row*38;ctx.fillStyle=colors[foot];ctx.fillText(foot,5,y+9);ctx.strokeStyle='#26343b';ctx.beginPath();ctx.moveTo(left,y+12);ctx.lineTo(w,y+12);ctx.stroke();});
+    for(const e of plan.events){const y=20+feet.indexOf(e.foot)*38,x=left+e.time/plan.duration*(w-left),end=left+Math.min(plan.duration,e.footOff)/plan.duration*(w-left);ctx.globalAlpha=.3;ctx.fillStyle=colors[e.foot];ctx.fillRect(x,y,Math.max(1,end-x),20);ctx.globalAlpha=1;ctx.fillRect(x,y-3,2.5,26);}
+    for(const hit of hits)for(const foot of hit.feet){const y=20+feet.indexOf(foot)*38;ctx.globalAlpha=.55;ctx.fillStyle='#90b8bd';const start=Math.max(0,hit.time),end=Math.min(plan.duration,hit.time+hit.duration);ctx.fillRect(left+start/plan.duration*(w-left),y+24,Math.max(1,(end-start)/plan.duration*(w-left)),2);}
+    ctx.globalAlpha=1;
+    if(plan.settings.saddleEnabled){ctx.fillStyle='#78adb1';ctx.fillText(t('siodło','saddle'),5,h-10);for(const c of plan.cycles){const x=left+c.start/plan.duration*(w-left);ctx.globalAlpha=.35;ctx.fillRect(x,h-21,c.duration/plan.duration*(w-left),12);}ctx.globalAlpha=1;}
+    canvas.setAttribute('aria-label',t('Kontakty i szacowany czas podparcia czterech kończyn. ','Contacts and approximate support intervals for four limbs. ')+plan.events.length+t(' kontaktów.',' contacts.'));
+  }
+  function stopAudition(){if(previewSource){try{previewSource.stop();}catch{}previewSource=null;}}
+  async function decodeFile(file){
+    if(file.size>120*1024*1024)throw new Error(t('Limit pojedynczego pliku to 120 MB.','The per-file limit is 120 MB.'));
+    let timer;
+    try{
+      const bytes=await file.arrayBuffer();
+      const buffer=await Promise.race([context().decodeAudioData(bytes),new Promise((_,reject)=>{timer=setTimeout(()=>reject(new Error(t('Dekodowanie przekroczyło 20 sekund.','Decoding exceeded 20 seconds.'))),20000);})]);
+      if(!buffer.length||buffer.duration>120||buffer.numberOfChannels>2)throw new Error(t('Wymagane nagranie mono/stereo, maksymalnie 120 sekund.','Use a mono/stereo recording up to 120 seconds long.'));
+      const memory=[...assets.values()].reduce((n,a)=>n+a.buffer.length*a.buffer.numberOfChannels*4,0)+buffer.length*buffer.numberOfChannels*4;
+      if(memory>220*1024*1024)throw new Error(t('Materiały przekraczają 220 MB zdekodowanego audio. Usuń nieużywane pliki.','Materials exceed 220 MB of decoded audio. Remove unused files.'));
+      const id='asset-'+M.hash(seed,file.name,file.size,Date.now(),assets.size).toString(16);
+      return {id,name:file.name,buffer};
+    }finally{clearTimeout(timer);}
+  }
+  function regionItem(asset,region,index=0){
+    const desc=A.descriptor(asset.buffer,region);
+    return {id:'sample-'+M.hash(seed,asset.id,region.start,index,Date.now()).toString(16),assetId:asset.id,
+      name:asset.name+(index?' #'+index:''),...region,...desc,foot:'any',gait:'any',strength:.5};
+  }
+  function rescore(){
+    const peaks=bank.filter(b=>b.kind!=='reference').map(b=>b.rms||0).sort((a,b)=>a-b);
+    for(const b of bank)if(!b.manualStrength)b.strength=peaks.length<3?.5:M.clamp(peaks.findIndex(v=>v>=b.rms)/Math.max(1,peaks.length-1),.15,.90);
+  }
+  function busyUI(value){
+    busy=value;document.querySelectorAll('input,select,button').forEach(e=>{if(e.closest('#sampleEditor'))return;if(value)e.dataset.wasDisabled=e.disabled?'1':'0';if(value)e.disabled=true;else if(e.dataset.wasDisabled!==undefined){e.disabled=e.dataset.wasDisabled==='1';delete e.dataset.wasDisabled;}});updateValues();
+    $('drop').style.pointerEvents=value?'none':'';
+  }
+  function askUploadMode(){
+    const overlay=$('uploadModeOverlay');overlay.style.display='flex';returnFocus=document.activeElement;$('uploadModeSingle').focus();
+    return new Promise(resolve=>{
+      const handlers=[];
+      function finish(mode){for(const [e,event,handler] of handlers)e.removeEventListener(event,handler);overlay.style.display='none';returnFocus?.focus();resolve(mode);}
+      for(const [id,mode] of [['uploadModeSingle','single'],['uploadModeMulti','multi'],['uploadModePair','pair'],['uploadModeReference','reference'],['uploadModeCancel',null]]){const fn=()=>finish(mode);$(id).addEventListener('click',fn);handlers.push([$(id),'click',fn]);}
+      const esc=e=>{if(e.key==='Escape')finish(null);};document.addEventListener('keydown',esc);handlers.push([document,'keydown',esc]);
+    });
+  }
+  async function importFiles(files,mode=null){
+    if(busy||!files.length)return;stopPlayback(true);
+    mode=mode||await askUploadMode();if(!mode)return;
+    busyUI(true);const failures=[];let added=0;
+    try{
+      for(let i=0;i<files.length;i++){
+        const file=files[i];status(`Analiza ${i+1}/${files.length}: ${file.name}`,`Analyzing ${i+1}/${files.length}: ${file.name}`);
+        try{
+          const asset=await decodeFile(file);asset.analysis=await A.analyze(asset.buffer,p=>{if(p>.05)status(`Analiza ${file.name}: ${Math.round(p*100)}%`,`Analyzing ${file.name}: ${Math.round(p*100)}%`);});
+          assets.set(asset.id,asset);
+          const regions=A.importRegions(asset.buffer,asset.analysis,mode);
+          regions.forEach((r,j)=>bank.push(regionItem(asset,r,regions.length>1?j+1:0)));added+=regions.length;
+        }catch(e){failures.push(file.name+': '+errorMessage(e));}
+        await wait();
+      }
+      rescore();markDirty();rawCache=null;rendered=null;revision++;renderBank();rebuild();
+      const blocked=bank.length&&!bank.some(b=>b.approved&&['single','pair'].includes(b.kind));
+      status(`Dodano ${added} wycinków. ${blocked?'Aby włączyć podgląd, kliknij Edytuj przy próbce, wybierz pojedyncze kopyto lub parę, ustaw wycinek i zatwierdź go. ':''}${failures.join(' | ')}`,
+        `Added ${added} regions. ${blocked?'To enable playback, click Edit beside a sample, select a single hoof or pair, set the region and approve it. ':''}${failures.join(' | ')}`);
+    }catch(e){status(errorMessage(e),errorMessage(e));}
+    finally{busyUI(false);$('fileInput').value='';}
+  }
+  function renderBank(){
+    const referenceChoice=$('compareReference').value;$('compareReference').replaceChildren();
+    for(const ref of bank.filter(b=>b.kind==='reference'))$('compareReference').append(tag('option',{value:ref.id,text:ref.name}));
+    if(bank.some(b=>b.id===referenceChoice))$('compareReference').value=referenceChoice;
+    $('compareA').disabled=!bank.some(b=>b.kind==='reference');
+    const list=$('sampleList');list.replaceChildren();
+    const visible=displayedAll?bank:bank.slice(0,4);
+    for(const item of visible){
+      const row=tag('li',{class:'sample-item sample-review-row'});
+      const info=tag('div',{class:'sample-info'});info.append(tag('strong',{text:item.name}),tag('small',{text:`${nameOf(item.kind)} | ${(item.end-item.start).toFixed(3)} s | ${item.gait==='any'?t('dowolny chód','any gait'):nameOf(item.gait)}${!item.approved?' | '+t('do sprawdzenia','review required'):''}`}));
+      const actions=tag('div',{class:'sample-actions'});
+      actions.append(button('', '▶','▶',()=>audition(item)),button('', 'Edytuj','Edit',()=>openEditor(item)),button('', 'Usuń','Remove',()=>{stopPlayback(true);bank=bank.filter(b=>b.id!==item.id);rescore();pruneAssets();markDirty();renderBank();invalidate();}));
+      actions.children[0].setAttribute('aria-label',t('Odsłuchaj ','Preview ')+item.name);
+      row.append(info,actions);list.append(row);
+    }
+    $('sampleCountLabel').textContent=bank.length+t(' wycinków',' regions');
+    $('toggleSamplesBtn').style.display=bank.length>4?'':'none';$('toggleSamplesBtn').textContent=displayedAll?t('Pokaż mniej','Show less'):t('Pokaż wszystkie','Show all')+' ('+bank.length+')';
+    const pending=bank.filter(b=>!b.approved&&b.kind!=='reference').length;
+    const refs=bank.filter(b=>b.kind==='reference').length;
+    $('bankWarning').textContent=pending?t(`${pending} wycinków wymaga sprawdzenia. Kliknij Edytuj przy próbce, wybierz typ i zatwierdź wycinek, aby użyć go w podglądzie.`,`${pending} regions need review. Click Edit beside a sample, select its type and approve the region to use it in playback.`):
+      bank.filter(b=>b.approved).length===1?t('Jedna próbka ogranicza naturalną różnorodność. Dodaj kilka różnych kontaktów.','One sample limits natural variation. Add several different contacts.'):
+      refs?t('Referencje służą do analizy; aby użyć wycinka, otwórz edytor i dodaj zatwierdzoną próbkę.','References are for analysis. Open the editor to add an approved sample region.') : '';
+    if(bank.some(b=>b.kind==='pair'&&b.approved))$('bankWarning').textContent+=t(' Nagrane pary zachowują odstęp wewnątrz nagrania. Aby kontrolować rozdzielenie w milisekundach, używaj pojedynczych kontaktów.',' Recorded pairs preserve their internal timing. Use single contacts to control dissociation in milliseconds.');
+    updateValues();
+  }
+  function pruneAssets(){const ids=new Set([...bank.map(b=>b.assetId),...Object.values(special).filter(Boolean)]);for(const id of assets.keys())if(!ids.has(id))assets.delete(id);}
+  function audition(item,withContext=false){
+    stopAudition();const asset=assets.get(item.assetId);if(!asset)return;
+    const c=context();c.resume();const src=c.createBufferSource();src.buffer=asset.buffer;
+    const gain=c.createGain();gain.gain.value=.8;src.connect(gain).connect(c.destination);
+    const start=Math.max(0,item.start-(withContext? .20:0)),end=Math.min(asset.buffer.duration,item.end+(withContext? .20:0));
+    src.start(c.currentTime+.01,start,end-start);previewSource=src;src.onended=()=>{if(previewSource===src)previewSource=null;};
+  }
+  async function compareReference(){
+    const ref=bank.find(b=>b.id===$('compareReference').value);if(!ref||busy)return;
+    stopAudition();stopPlayback(true);
+    try{
+      const audio=await prepareAudio(),asset=assets.get(ref.assetId),c=context();await c.resume();
+      const length=Math.min(ref.end-ref.start,audio.duration),region={start:ref.start,end:ref.start+length};
+      const rms=A.descriptor(asset.buffer,region).rms,target=M.db(audio.metrics.rms);
+      const gain=$('compareMatch').checked?M.clamp(target/Math.max(1e-8,rms),M.db(-30),M.db(18)):1;
+      const src=c.createBufferSource(),volume=c.createGain();src.buffer=asset.buffer;volume.gain.value=gain;src.connect(volume).connect(c.destination);src.start(c.currentTime+.02,ref.start,length);previewSource=src;
+      status('Porównanie A: '+ref.name,'Comparison A: '+ref.name);
+    }catch(e){status(errorMessage(e),errorMessage(e));}
+  }
+  function openEditor(item){
+    stopPlayback(true);editorItem=item;returnFocus=document.activeElement;
+    $('editorTitle').textContent=item.name;
+    for(const [key,id] of [['start','editStart'],['onset','editOnset'],['end','editEnd']])$(id).value=item[key].toFixed(3);
+    $('editKind').value=item.kind;$('editFoot').value=item.foot||'any';$('editGait').value=item.gait||'any';$('editStrength').value=item.strength<.4?'.25':item.strength>.7?'.85':'.5';$('editApproved').checked=!!item.approved;$('editZoom').checked=false;
+    $('editSurface').value=item.surface||'any';$('editPerspective').value=item.perspective||'any';
+    $('editorInfo').textContent=t('Kontakt jest znacznikiem rytmu. Kliknij obwiednię, aby go ustawić. Krótkie fragmenty mogą zawierać więcej niż jedno uderzenie.','The contact marker anchors the rhythm. Click the waveform to set it. Short regions can contain more than one impact.');
+    $('editorInfo').textContent+=t(' Pewność detekcji: ','Detection confidence: ')+Math.round((item.confidence||0)*100)+'% | RMS '+A.levelDb(item.rms||0).toFixed(1)+' dBFS';
+    $('sampleEditor').showModal();drawEditor();
+  }
+  function editorRegion(){
+    if(!editorItem)return null;const asset=assets.get(editorItem.assetId);
+    const start=+$('editStart').value,onset=+$('editOnset').value,end=+$('editEnd').value;
+    if(![start,onset,end].every(Number.isFinite)||start<0||start>onset||onset>=end||end>asset.buffer.duration+.001||end-start<.012)throw new Error(t('Ustaw: 0 ≤ początek ≤ kontakt < koniec ≤ długość nagrania.','Set: 0 ≤ start ≤ contact < end ≤ recording duration.'));
+    return {...editorItem,start,onset,end:Math.min(end,asset.buffer.duration),kind:$('editKind').value,foot:$('editFoot').value,gait:$('editGait').value,surface:$('editSurface').value,perspective:$('editPerspective').value,strength:+$('editStrength').value,manualStrength:true,approved:$('editApproved').checked};
+  }
+  function drawEditor(){
+    if(!editorItem)return;const asset=assets.get(editorItem.assetId),canvas=$('editorWave'),ctx=canvas.getContext('2d'),w=canvas.width,h=canvas.height;
+    const start=+$('editStart').value,end=+$('editEnd').value,onset=+$('editOnset').value;
+    const viewStart=$('editZoom').checked?Math.max(0,start-.05):0,viewEnd=$('editZoom').checked?Math.min(asset.buffer.duration,end+.05):asset.buffer.duration;
+    canvas.dataset.start=viewStart;canvas.dataset.end=viewEnd;ctx.fillStyle='#0b1115';ctx.fillRect(0,0,w,h);
+    const data=asset.buffer.getChannelData(0),scale=.45*h/Math.max(asset.analysis?.peak||.5,.001);
+    ctx.strokeStyle='#7a999f';ctx.beginPath();
+    for(let x=0;x<w;x++){const a=Math.floor((viewStart+(viewEnd-viewStart)*x/w)*asset.buffer.sampleRate),b=Math.min(data.length,Math.ceil((viewStart+(viewEnd-viewStart)*(x+1)/w)*asset.buffer.sampleRate));let peak=0;for(let i=a;i<b;i++)peak=Math.max(peak,Math.abs(data[i]));ctx.moveTo(x,h/2-peak*scale);ctx.lineTo(x,h/2+peak*scale);}ctx.stroke();
+    const xFor=time=>(time-viewStart)/(viewEnd-viewStart)*w;
+    ctx.fillStyle='rgba(240,184,92,.12)';ctx.fillRect(xFor(start),0,xFor(end)-xFor(start),h);
+    for(const [time,color] of [[start,'#75c79d'],[onset,'#ffc96f'],[end,'#d58976']]){ctx.strokeStyle=color;ctx.beginPath();ctx.moveTo(xFor(time),0);ctx.lineTo(xFor(time),h);ctx.stroke();}
+    canvas.setAttribute('aria-label',t('Obwiednia i znaczniki początku, kontaktu oraz końca.','Waveform and markers for region start, contact and end.'));
+  }
+  function auditionEditor(withContext){try{audition(editorRegion(),withContext);}catch(e){$('editorInfo').textContent=errorMessage(e);}}
+  function saveEditor(copy){
+    try{
+      const item=editorRegion(),asset=assets.get(item.assetId);if(['group','reference'].includes(item.kind))item.approved=false;
+      if(item.approved&&item.kind==='single'&&item.end-item.start>1.5)throw new Error(t('Pojedynczy kontakt może mieć do 1,5 s. Dłuższy materiał oznacz jako grupę lub referencję.','A single contact can be up to 1.5 seconds. Mark longer material as a group or reference.'));
+      Object.assign(item,A.descriptor(asset.buffer,item));
+      if(copy){item.id='sample-'+M.hash(seed,Date.now(),bank.length).toString(16);item.name=asset.name+' '+t('wycinek','region');bank.push(item);}else Object.assign(editorItem,item);
+      markDirty();renderBank();invalidate();$('sampleEditor').close();
+    }catch(e){$('editorInfo').textContent=errorMessage(e);}
+  }
+  function calibrateReference(){
+    if(!editorItem)return;const asset=assets.get(editorItem.assetId),target=$('editGait').value==='any'?gait:$('editGait').value;
+    const expected=/slow/i.test(asset.name)&&target==='gallop'?.6:60/M.GAITS[target].tempo;
+    const estimate=A.estimatePeriod(asset.analysis,expected);
+    if(estimate.confidence<.12){$('editorInfo').textContent=t('Brak dostatecznie wyraźnego powtórzenia. Ustaw tempo ręcznie i sprawdź grupowanie.','No sufficiently clear repetition was found. Set cadence manually and check the grouping.');return;}
+    $('transitionMode').value='none';setGait(target);$('tempo').value=(60/estimate.period).toFixed(2);$('speed').value=100;$('strideLength').value=100;
+    $('tempoChange').value=0;markDirty();invalidate();$('editorInfo').textContent=t('Zastosowano okres akustyczny ','Applied acoustic period ')+estimate.period.toFixed(3)+t(' s. To nie identyfikuje kończyn.',' s. This does not identify limbs.');
+  }
+  async function loadSpecialFile(key,file){
+    if(!file||busy)return;busyUI(true);stopPlayback(true);
+    try{const asset=await decodeFile(file);asset.analysis=await A.analyze(asset.buffer);assets.set(asset.id,asset);special[key]=asset.id;pruneAssets();markDirty();updateSaddleNames();invalidate();status('Materiał warstwy jest gotowy.','Layer material is ready.');}
+    catch(e){status(errorMessage(e),errorMessage(e));}finally{busyUI(false);}
+  }
+  function updateSaddleNames(){
+    $('saddleBankNames').textContent=t('Stęp: ','Walk: ')+(assets.get(special.walk)?.name||t('plik domyślny','default file'))+' | '+t('Pozostałe: ','Other gaits: ')+(assets.get(special.other)?.name||t('plik domyślny','default file'));
+    $('saddleState').textContent=$('saddleEnabled').checked?t('Warstwa siodła włączona.','Saddle layer enabled.'):t('Warstwa siodła wyłączona.','Saddle layer disabled.');
+  }
+  async function ensureSpecial(s){
+    if(s.saddleEnabled){
+      const gs=M.gaitList(s),keys=[];if(gs.includes('walk'))keys.push('walk');if(gs.some(g=>g!=='walk'))keys.push('other');
+      for(const key of keys){if(special[key]&&assets.has(special[key]))continue;
+        const filename=key==='walk'?'saddle_walk_movement.mp3':'saddle_movement.mp3';
+        try{
+          const response=await fetch('saddle_movement/'+filename);if(!response.ok)throw new Error('HTTP '+response.status);
+          const asset=await decodeFile(new File([await response.blob()],filename,{type:'audio/mpeg'}));asset.analysis=await A.analyze(asset.buffer);if(!special[key]||!assets.has(special[key])){assets.set(asset.id,asset);special[key]=asset.id;}
+        }catch{throw new Error(t('Wczytaj plik siodła w sekcji „Materiał i charakter siodła”: ','Load the saddle file under “Saddle material and character”: ')+filename);}
+      }
+    }
+    if(s.groundEnabled&&!assets.has(special.ground))throw new Error(t('Wgraj nagranie tekstury podłoża albo wyłącz tę warstwę.','Upload a ground texture recording or disable that layer.'));
+    updateSaddleNames();
+  }
+  function outputRate(s){return s.fileFormat==='mp3'||s.wavFormat==='44'?44100:48000;}
+  async function prepareAudio({dry=false}={}){
+    while(renderingPromise){try{await renderingPromise;}catch(e){if(e.message!=='STALE_RENDER')throw e;}if(rendered&&!dry)return rendered;}
+    const token=revision,s=readSettings();
+    if(rendered&&!dry)return rendered;
+    const work=(async()=>{
+      await ensureSpecial(s);if(token!==revision)throw new Error('STALE_RENDER');
+      if(!plan||!rawCache)rebuild();
+      if(plan.warnings.includes('NO_SINGLE_SAMPLE'))throw new Error('NO_SINGLE_SAMPLE');
+      if(!hits.length)throw new Error('NO_SINGLE_SAMPLE');
+      if(!rawCache){
+        const layers={hooves:hits,saddle:A.saddleEvents(plan,{walk:assets.get(special.walk),other:assets.get(special.other)}),ground:A.groundEvents(plan,assets.get(special.ground))};
+        status('Przygotowywanie wspólnego podglądu i eksportu...','Preparing shared preview and export audio...');
+        const audio=await A.renderLayers(plan,layers,assets,outputRate(s),p=>status('Renderowanie warstw: '+Math.round(p*100)+'%','Rendering layers: '+Math.round(p*100)+'%'));
+        if(token!==revision)throw new Error('STALE_RENDER');rawCache=audio;
+      }
+      const result=A.processMix(rawCache,s,{dry});if(token!==revision)throw new Error('STALE_RENDER');
+      if(!dry)rendered=result;updateValues();return result;
+    })();
+    renderingPromise=work;
+    try{return await work;}catch(e){
+      if(e.message==='STALE_RENDER'){if(renderingPromise===work)renderingPromise=null;return prepareAudio({dry});}
+      throw e;
+    }finally{if(renderingPromise===work)renderingPromise=null;}
+  }
+  function makeBuffer(data,rate){const ctx=context(),buf=ctx.createBuffer(data.length,data[0].length,rate);data.forEach((d,c)=>buf.copyToChannel(d,c));return buf;}
+  function currentPosition(){return playing?pausedAt+Math.max(0,context().currentTime-playerStart):pausedAt;}
+  function startPrepared(audio,offset=0){
+    const c=context();c.resume();const src=c.createBufferSource(),gain=c.createGain();src.buffer=makeBuffer(audio.data,audio.sampleRate);src.loop=audio.loop;
+    const handoff=c.currentTime+.025;src.connect(gain).connect(c.destination);gain.gain.setValueAtTime(player?0:1,handoff);
+    if(player){gain.gain.linearRampToValueAtTime(1,handoff+.020);const old=player;old.gain.gain.cancelScheduledValues(handoff);old.gain.gain.setValueAtTime(old.gain.gain.value,handoff);old.gain.gain.linearRampToValueAtTime(0,handoff+.020);try{old.src.stop(handoff+.022);}catch{}}
+    const at=audio.loop?offset%audio.duration:Math.min(offset,Math.max(0,audio.duration-.001));
+    player={src,gain};pausedAt=at;playerStart=handoff;src.start(playerStart,at);playing=true;
+    src.onended=()=>{if(player?.src===src&&!src.loop){player=null;playing=false;pausedAt=0;updateValues();$('playBtn').textContent='▶';cancelAnimationFrame(raf);$('playhead').style.left='0%';}};
+    $('playBtn').textContent='❚❚';$('playBtn').classList.add('active');updateValues();animatePlayhead();
+  }
+  function animatePlayhead(){
+    cancelAnimationFrame(raf);
+    const frame=()=>{if(!playing||!rendered)return;let pos=currentPosition();if(rendered.loop)pos%=rendered.duration;
+      const motionPos=Math.max(0,pos-rendered.startPad);$('bigTime').textContent=(pos/60|0)+':'+(pos%60).toFixed(2).padStart(5,'0');$('playhead').style.left=(100*Math.min(1,motionPos/plan.duration))+'%';raf=requestAnimationFrame(frame);};raf=requestAnimationFrame(frame);
+  }
+  async function refreshPlayback(){
+    try{const audio=await prepareAudio();if(playing)startPrepared(audio,currentPosition());}
+    catch(e){if(e.message!=='STALE_RENDER')status(errorMessage(e),errorMessage(e));}
+  }
+  async function play(){
+    if(busy||preparingPlayback)return;stopAudition();
+    if(playing){pausedAt=currentPosition();if(rendered?.loop)pausedAt%=rendered.duration;stopPlayback(false);return;}
+    preparingPlayback=true;
+    try{await context().resume();$('playBtn').disabled=true;const audio=await prepareAudio();startPrepared(audio,pausedAt);status('Odtwarzanie przygotowanego wariantu.','Playing the prepared variation.');}
+    catch(e){if(e.message!=='STALE_RENDER')status(errorMessage(e),errorMessage(e));}finally{preparingPlayback=false;updateValues();}
+  }
+  function stopPlayback(reset=true){
+    if(player){try{player.src.stop();}catch{}player=null;}
+    playing=false;cancelAnimationFrame(raf);if(reset)pausedAt=0;$('playBtn').textContent='▶';$('playBtn').classList.remove('active');
+    if(reset){$('bigTime').textContent='0:00.00';$('playhead').style.left='0%';}updateValues();
+  }
+  function download(blob,name){const url=URL.createObjectURL(blob),a=tag('a',{href:url,download:name});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(url),60000);}
+  function mp3(data,rate,kbps){
+    if(typeof lamejs==='undefined')throw new Error(t('Koder MP3 jest niedostępny. Użyj WAV lub sprawdź połączenie z internetem.','The MP3 encoder is unavailable. Use WAV or check the internet connection.'));
+    if(A.peakOf(data).peak>=1)throw new Error('PCM_CLIPPING');
+    const enc=new lamejs.Mp3Encoder(2,rate,kbps),chunks=[];
+    for(let i=0;i<data[0].length;i+=1152){const convert=d=>Int16Array.from(d.subarray(i,i+1152),v=>Math.round(M.clamp(v,-1,1)*32767));const out=enc.encodeBuffer(convert(data[0]),convert(data[1]));if(out.length)chunks.push(out);}
+    const end=enc.flush();if(end.length)chunks.push(end);return new Blob(chunks,{type:'audio/mpeg'});
+  }
+  async function exportAudio(){
+    if(busy)return;stopAudition();stopPlayback(true);busyUI(true);
+    try{
+      const s=readSettings(),audio=await prepareAudio(),sep=s.saddleEnabled&&s.exportSaddleStem;
+      const stemAudio=sep&&s.exportProcessing==='dry'?A.processMix(rawCache,s,{dry:true}):audio;
+      const basename='horse-movement-'+gait+'-seed-'+seed+'-v1_6'+(s.loopMode?'-loop':'');
+      const files=[];
+      const encode=(data,tagName)=>{
+        const file=s.fileFormat==='mp3'?mp3(data,audio.sampleRate,+s.mp3Bitrate):new Blob([A.encodeWav(data,audio.sampleRate,s.wavFormat==='32'?32:s.wavFormat==='24'?24:16,s.dither,seed)],{type:'audio/wav'});
+        files.push({blob:file,name:basename+tagName+'.'+s.fileFormat});
+      };
+      if(sep){
+        const hooves=stemAudio.layers.hooves.map((d,c)=>Float32Array.from(d,(v,i)=>v+(s.groundEnabled?(stemAudio.layers.ground?.[c]?.[i]||0):0)));
+        encode(hooves,s.groundEnabled?'-hooves-ground':'-hooves');encode(stemAudio.layers.saddle,'-saddle');
+      }else encode(audio.data,s.saddleEnabled?'-mix':'-hooves');
+      // Both files are fully encoded before the first download starts.
+      for(let i=0;i<files.length;i++){download(files[i].blob,files[i].name);if(i===0&&files.length>1)await new Promise(r=>setTimeout(r,250));}
+      status(t('Eksport gotowy: ','Export ready: ')+files.length+t(' plików, ',' files, ')+audio.duration.toFixed(3)+' s.',t('Eksport gotowy: ','Export ready: ')+files.length+t(' plików, ',' files, ')+audio.duration.toFixed(3)+' s.');
+    }catch(e){status(errorMessage(e),errorMessage(e));}finally{busyUI(false);}
+  }
+  const PRESET_KEY='horseMovementPresetsV2';
+  function storedPresets(){try{return JSON.parse(localStorage.getItem(PRESET_KEY)||localStorage.getItem('horseGaitCustomPresetsV1')||'[]').filter(p=>p&&typeof p==='object');}catch{return [];}}
+  function renderPresets(){
+    const list=$('presetIoList');list.replaceChildren();const presets=storedPresets();$('presetIoEmpty').style.display=presets.length?'none':'';
+    for(const [index,p] of presets.entries()){
+      const row=tag('li',{class:'preset-io-item'});row.append(tag('strong',{text:String(p.name||t('Bez nazwy','Untitled'))}));
+      row.append(button('', 'Wczytaj','Load',async()=>{
+        let s=p.settings||{...(p.state?.values||p.values||{}),gait:p.state?.gait||p.gait||gait};
+        if(!p.engine){s={...s,transient:M.clamp((+s.transient||0)/20,0,6),body:M.clamp((+s.body||0)/25,0,6),neutral:false};}
+        stopPlayback(true);writeSettings(M.settings(s));if(Number.isInteger(p.seed))seed=p.seed>>>0;$('characterPreset').value='custom';markDirty();revision++;rawCache=null;rendered=null;rebuild();updateSaddleNames();
+        status('Wczytano ustawienia. Sprawdź zgodność załadowanych nagrań.','Settings loaded. Check that the matching recordings are loaded.');$('presetIoOverlay').style.display='none';
+      }),button('', 'Usuń','Delete',()=>{const all=storedPresets();all.splice(index,1);localStorage.setItem(PRESET_KEY,JSON.stringify(all));renderPresets();}));list.append(row);
+    }
+  }
+  function savePreset(){
+    const name=$('presetIoNameInput').value.trim();if(!name){status('Podaj nazwę presetu.','Enter a preset name.');return;}
+    try{const all=storedPresets();all.push({name,engine:M.VERSION,settings:readSettings(),seed,sourceNames:bank.map(b=>b.name)});localStorage.setItem(PRESET_KEY,JSON.stringify(all));renderPresets();status('Zapisano ustawienia. Aby zachować audio, zapisz pełny projekt.','Settings saved. Save a complete project to preserve the audio.');}
+    catch(e){status('Nie udało się zapisać presetu w tej przeglądarce.','This browser could not save the preset.');}
+  }
+  async function saveProject(){
+    if(busy)return;busyUI(true);
+    try{
+      const s=readSettings();await ensureSpecial(s);pruneAssets();
+      const sources=[...assets.values()];
+      const metadata={format:'horse-movement-project',version:1,engine:M.VERSION,settings:s,seed,variant,character:$('characterPreset').value,bank:bank.map(b=>({...b})),special:{...special},
+        assets:sources.map(a=>({id:a.id,name:a.name,sampleRate:a.buffer.sampleRate,channels:a.buffer.numberOfChannels,length:a.buffer.length}))};
+      const json=new TextEncoder().encode(JSON.stringify(metadata));const header=new ArrayBuffer(12),view=new DataView(header);
+      new Uint8Array(header).set(new TextEncoder().encode('HORSEPRJ'));view.setUint32(8,json.length,true);
+      const chunks=[header,json];for(const a of sources)for(let c=0;c<a.buffer.numberOfChannels;c++)chunks.push(a.buffer.getChannelData(c));
+      const archive=HorseArchive.pack(await new Blob(chunks).arrayBuffer());
+      if(projectUrl)URL.revokeObjectURL(projectUrl);projectUrl=URL.createObjectURL(new Blob([archive],{type:'application/zip'}));projectRevision=revision;
+      const link=$('projectDownload');link.href=projectUrl;link.download='horse-movement-'+seed+'-project.zip';link.hidden=false;
+      status('Projekt gotowy. Kliknij „Pobierz przygotowany projekt”, aby zapisać ustawienia i audio.','Project ready. Click “Download prepared project” to save settings and audio.');
+    }catch(e){status(errorMessage(e),errorMessage(e));}finally{busyUI(false);}
+  }
+  async function loadProject(file){
+    if(!file||busy)return;busyUI(true);stopPlayback(true);
+    try{
+      if(file.size>240*1024*1024)throw new Error(t('Projekt przekracza limit 240 MB.','The project exceeds 240 MB.'));
+      let bytes=await file.arrayBuffer();if(bytes.byteLength>=4&&new DataView(bytes).getUint32(0,true)===0x04034b50)bytes=HorseArchive.unpack(bytes);const view=new DataView(bytes);
+      if(bytes.byteLength<12||new TextDecoder().decode(new Uint8Array(bytes,0,8))!=='HORSEPRJ')throw new Error(t('Nieprawidłowy plik projektu.','Invalid project file.'));
+      const metaLength=view.getUint32(8,true);if(metaLength>8*1024*1024||metaLength+12>bytes.byteLength)throw new Error('Invalid project metadata');
+      const meta=JSON.parse(new TextDecoder().decode(new Uint8Array(bytes,12,metaLength)));
+      if(meta.format!=='horse-movement-project'||meta.version!==1||meta.engine!==M.VERSION||!Array.isArray(meta.assets)||!Array.isArray(meta.bank)||meta.bank.length>2000||meta.assets.length>250)throw new Error(t('Nieobsługiwana wersja projektu lub przekroczone limity.','Unsupported project version or limits exceeded.'));
+      let cursor=12+metaLength;const incoming=new Map();
+      for(const source of meta.assets){
+        if(typeof source.id!=='string'||incoming.has(source.id)||![1,2].includes(source.channels)||!Number.isInteger(source.sampleRate)||source.sampleRate<8000||source.sampleRate>192000||!Number.isInteger(source.length)||source.length<1||source.length/source.sampleRate>120)throw new Error('Invalid audio metadata');
+        const size=source.channels*source.length*4;if(cursor+size>bytes.byteLength)throw new Error('Truncated audio');
+        const buffer=context().createBuffer(source.channels,source.length,source.sampleRate);
+        for(let c=0;c<source.channels;c++){const dest=buffer.getChannelData(c);for(let i=0;i<source.length;i++){const value=view.getFloat32(cursor,true);cursor+=4;if(!Number.isFinite(value))throw new Error('NONFINITE_AUDIO');dest[i]=value;}}
+        const asset={id:source.id,name:String(source.name||'audio'),buffer};asset.analysis=await A.analyze(buffer);incoming.set(asset.id,asset);await wait();
+      }
+      if(cursor!==bytes.byteLength)throw new Error('Unexpected project data');
+      const newBank=meta.bank.map(b=>{
+        const a=incoming.get(b.assetId);if(!a||typeof b.id!=='string'||!['single','pair','group','reference'].includes(b.kind)||![b.start,b.onset,b.end].every(Number.isFinite)||b.start<0||b.start>b.onset||b.onset>=b.end||b.end>a.buffer.duration+.0001)throw new Error('Invalid sample region');
+        if(b.kind==='single'&&b.end-b.start>1.5&&b.approved)throw new Error('Invalid approved contact');
+        return {...b,name:String(b.name),approved:!!b.approved&&['single','pair'].includes(b.kind),strength:M.clamp(Number(b.strength)||.5,0,1),foot:['any',...M.FEET].includes(b.foot)?b.foot:'any',gait:['any',...Object.keys(M.GAITS)].includes(b.gait)?b.gait:'any'};
+      });
+      const newSpecial={};for(const key of ['walk','other','ground']){const id=meta.special?.[key];if(id&&!incoming.has(id))throw new Error('MISSING_AUDIO_ASSET');newSpecial[key]=id||null;}
+      const newSettings=M.settings(meta.settings);validatePhases(newSettings);M.makeMotion(newSettings,meta.seed);
+      if(!Number.isInteger(meta.seed)||meta.seed<0||meta.seed>4294967295||new Set(newBank.map(b=>b.id)).size!==newBank.length)throw new Error('Invalid project identity');
+      // Commit only after every region and audio payload has been validated.
+      assets=incoming;bank=newBank;special=newSpecial;seed=meta.seed>>>0;variant=Number.isInteger(meta.variant)?meta.variant:1;
+      writeSettings(newSettings);$('characterPreset').value='custom';revision++;rawCache=null;rendered=null;rebuild();renderBank();updateSaddleNames();dirty=false;
+      status('Wczytano pełny projekt wraz z audio i seedem.','The complete project, audio and seed have been loaded.');
+    }catch(e){status(errorMessage(e),errorMessage(e));}finally{busyUI(false);$('projectInput').value='';}
+  }
+  async function loadDemo(){
+    if(busy)return;
+    try{const response=await fetch('hoof_samples/hoof_dirt_sample.mp3');if(!response.ok)throw new Error();await importFiles([new File([await response.blob()],'hoof_dirt_sample.mp3',{type:'audio/mpeg'})],'multi');}
+    catch{status('Umieść hoof_dirt_sample.mp3 w folderze hoof_samples albo wgraj własne próbki.','Place hoof_dirt_sample.mp3 in the hoof_samples folder or upload your own samples.');}
+  }
+  function initEvents(){
+    document.querySelectorAll('.language-btn').forEach(b=>b.addEventListener('click',()=>language(b.dataset.language)));
+    $('gaits').addEventListener('click',e=>{const b=e.target.closest('[data-gait]');if(b)setGait(b.dataset.gait);});
+    $('gaits').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();e.target.click();}});
+    $('characterPreset').addEventListener('change',()=>applyPreset($('characterPreset').value));
+    const mixKeys=new Set(['hoofVolume','saddleVolume','groundVolume','masterVolume','mixProcessing','limiter','hoofMute','hoofSolo','saddleMute','saddleSolo','groundMute','groundSolo']);
+    const nonAudio=new Set(['dither','exportProcessing','exportSaddleStem','mp3Bitrate','referencePreset']);
+    for(const key of Object.keys(defaults)){
+      const input=$(key);if(!input||input.type==='file')continue;
+      input.addEventListener(input.type==='range'||input.type==='number'?'input':'change',()=>{
+        if(presetApplying||busy)return;
+        if(key==='transitionMode'){
+          const gs=M.gaitList(readSettings());if(gs.length>1){gait=gs[0];$('tempo').value=M.GAITS[gait].tempo;for(let i=1;i<=3;i++)$('phase'+i).value='';}
+        }
+        if(M.CHARACTER_FIELDS.includes(key))$('characterPreset').value='custom';
+        markDirty();if(nonAudio.has(key))updateValues();else invalidate({mixOnly:mixKeys.has(key)});
+        if(key==='saddleEnabled')updateSaddleNames();
+      });
+    }
+    $('referencePreset').addEventListener('change',()=>{
+      const value=$('referencePreset').value;if(value==='custom')return;
+      $('transitionMode').value='none';const target=value.startsWith('gallop')?'gallop':value;setGait(target);
+      $('tempo').value=value==='gallop-slow'?100:value==='gallop-fast'?150:M.GAITS[target].tempo;
+      $('speed').value=100;$('strideLength').value=100;$('tempoChange').value=0;invalidate();markDirty();
+    });
+    $('drop').addEventListener('click',()=>{if(!busy)$('fileInput').click();});
+    $('drop').addEventListener('keydown',e=>{if(['Enter',' '].includes(e.key)){e.preventDefault();$('drop').click();}});
+    $('drop').addEventListener('dragover',e=>{e.preventDefault();$('drop').classList.add('drag');});$('drop').addEventListener('dragleave',()=>$('drop').classList.remove('drag'));
+    $('drop').addEventListener('drop',e=>{e.preventDefault();$('drop').classList.remove('drag');importFiles([...e.dataTransfer.files]);});
+    $('fileInput').addEventListener('change',e=>importFiles([...e.target.files]));
+    $('loadDemoSamplesBtn').addEventListener('click',loadDemo);$('toggleSamplesBtn').addEventListener('click',()=>{displayedAll=!displayedAll;renderBank();});
+    $('clearAllBtn').addEventListener('click',()=>{stopPlayback(true);bank=[];pruneAssets();renderBank();invalidate();markDirty();});
+    $('playBtn').addEventListener('click',play);$('stopVisual').addEventListener('click',()=>stopPlayback(true));$('renderBtn').addEventListener('click',exportAudio);
+    $('rerollBtn').addEventListener('click',()=>{stopPlayback(true);seed=(Math.random()*4294967296)>>>0;variant++;markDirty();invalidate();});
+    for(const [id,key] of [['saddleWalkInput','walk'],['saddleOtherInput','other'],['groundInput','ground']])$(id).addEventListener('change',e=>loadSpecialFile(key,e.target.files[0]));
+    for(const id of ['editStart','editOnset','editEnd'])$(id).addEventListener('input',drawEditor);$('editZoom').addEventListener('change',drawEditor);
+    $('editorWave').addEventListener('click',e=>{const rect=e.currentTarget.getBoundingClientRect(),ratio=(e.clientX-rect.left)/rect.width;const time=+e.currentTarget.dataset.start+ratio*(+e.currentTarget.dataset.end-+e.currentTarget.dataset.start);$('editOnset').value=time.toFixed(3);drawEditor();});
+    $('sampleEditor').addEventListener('close',()=>{stopAudition();editorItem=null;returnFocus?.focus();});
+    $('presetIoBtn').addEventListener('click',()=>{returnFocus=document.activeElement;renderPresets();$('presetIoOverlay').style.display='flex';$('presetIoNameInput').focus();});
+    $('presetIoClose').addEventListener('click',()=>{$('presetIoOverlay').style.display='none';returnFocus?.focus();});$('presetIoSaveBtn').addEventListener('click',savePreset);
+    $('projectInput').addEventListener('change',e=>loadProject(e.target.files[0]));
+    document.querySelectorAll('.reset-tile-btn').forEach(b=>b.addEventListener('click',()=>{
+      const section=b.closest('.export-col,.section');const current=readSettings(),base={...defaults,...M.preset('realistyczny',gait)};
+      section.querySelectorAll('input,select').forEach(input=>{if(base[input.id]!==undefined)current[input.id]=base[input.id];});
+      writeSettings(current);$('characterPreset').value='custom';invalidate();markDirty();
+    }));
+    document.addEventListener('keydown',e=>{
+      const overlay=[$('uploadModeOverlay'),$('presetIoOverlay')].find(el=>el.style.display==='flex');if(!overlay)return;
+      if(e.key==='Escape'&&overlay.id==='presetIoOverlay')$('presetIoClose').click();
+      if(e.key==='Tab'){const focus=[...overlay.querySelectorAll('button,input,select')].filter(el=>!el.disabled);const index=focus.indexOf(document.activeElement);if(e.shiftKey&&index<=0){e.preventDefault();focus.at(-1)?.focus();}else if(!e.shiftKey&&index===focus.length-1){e.preventDefault();focus[0]?.focus();}}
+    });
+    window.addEventListener('beforeunload',e=>{if(dirty){e.preventDefault();e.returnValue='';}});
+    // Keep the established refresh-reset behavior. Presets remain available.
+    try{localStorage.removeItem('horseGaitAutoStateV1');localStorage.removeItem('horseGaitSamplesV1');}catch{}
+  }
+  createExtraUI();decorateRanges();captureStaticText();initEvents();writeSettings({...defaults,...M.preset('realistyczny','walk')});
+  $('characterPreset').value='realistyczny';language('en');rebuild();ready=true;dirty=false;
+  // Read-only diagnostics help verify saved projects and engine versions.
+  window.HorseMovement=Object.freeze({version:M.VERSION,getState:()=>({settings:readSettings(),seed,variant,dirty,samples:bank.map(b=>({...b})),motion:plan,metrics:rendered?.metrics||null})});
+})();
+
+</script>
+</body>
+</html>
